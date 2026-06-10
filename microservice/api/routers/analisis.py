@@ -2,6 +2,7 @@ from application.use_cases.analizar_contribuyente import AnalisisDTO, AnalizarCo
 from fastapi import APIRouter, Depends
 
 from api.deps import get_analizar_use_case
+from api.middleware.auth import AuthDep
 
 router = APIRouter()
 
@@ -10,6 +11,7 @@ router = APIRouter()
     "/analizar/{nit}",
     response_model=AnalisisDTO,
     summary="Análisis completo de fiscalización para un contribuyente",
+    dependencies=[AuthDep],
 )
 async def analizar_contribuyente(
     nit: str,

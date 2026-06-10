@@ -1,4 +1,4 @@
-"""Pruebas de integración real contra NVIDIA NIM y Hugging Face.
+"""Pruebas de integración real contra NVIDIA NIM.
 
 Ejecutar con:
   PYTHONPATH=microservice pytest tests/integration/test_llm_real.py -v -x
@@ -7,6 +7,7 @@ Ejecutar con:
 import json
 
 import pytest
+from config import settings
 from infrastructure.adapters.llm.litellm_adapter import LiteLLMAdapter
 from infrastructure.adapters.llm.prompts import Prompts
 
@@ -23,6 +24,13 @@ def adapter():
 @pytest.fixture
 def prompts():
     return Prompts()
+
+
+@pytest.fixture
+def adapter_fast_fail(monkeypatch):
+    """Adapter con timeout bajo para que los fallos rápidos no tarden minutos."""
+    monkeypatch.setattr(settings, "llm_timeout", 5)
+    return LiteLLMAdapter()
 
 
 @pytest.mark.asyncio
@@ -45,13 +53,17 @@ async def test_nvidia_nim_respuesta_valida(adapter, prompts, tipo):
 
 
 @pytest.mark.asyncio
-async def test_fallback_nvidia_llama3_2_3b(adapter, prompts):
-    """Provoca fallo en primary para probar fallback a NVIDIA llama-3.2-3b."""
-    original_key = adapter.router.model_list[0]["litellm_params"]["api_key"]
+async def test_fallback_nvidia_llama3_2_3b(adapter_fast_fail, prompts):
+    """Provoca fallo en primary para probar fallback a NVIDIA llama-3.2-3b.
+
+    Usa adapter_fast_fail (timeout=5s) para que los reintentos del primary
+    no extiendan el test a minutos.
+    """
+    original_key = adapter_fast_fail.router.model_list[0]["litellm_params"]["api_key"]
     try:
-        adapter.router.model_list[0]["litellm_params"]["api_key"] = "bad-key-for-testing"
+        adapter_fast_fail.router.model_list[0]["litellm_params"]["api_key"] = "bad-key-for-testing"
         ctx = _contexto_ejemplo("analisis_completo")
-        resultado = await adapter.analizar(ctx)
+        resultado = await adapter_fast_fail.analizar(ctx)
 
         assert "explicacion" in resultado
         if resultado.get("modo_degradado"):
@@ -62,7 +74,7 @@ async def test_fallback_nvidia_llama3_2_3b(adapter, prompts):
             msg = f"llama-3.2-3b fallback OK: {resultado['tokens_entrada']} in / {resultado['tokens_salida']} out"
             print(msg)
     finally:
-        adapter.router.model_list[0]["litellm_params"]["api_key"] = original_key
+        adapter_fast_fail.router.model_list[0]["litellm_params"]["api_key"] = original_key
 
 
 @pytest.mark.asyncio
