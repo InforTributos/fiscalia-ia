@@ -1,0 +1,56 @@
+@startuml arquitectura-hexagonal
+!theme plain
+skinparam backgroundColor white
+
+package "INBOUND ADAPTERS" #LightBlue {
+  [FastAPI Routers] as routers
+  [Pydantic Schemas] as schemas
+  [Auth Middleware] as auth
+  [DI Wiring] as di
+}
+
+package "APPLICATION" #LightGreen {
+  [AnalizarContribuyente] as analizar_uc
+  [CalcularScore] as score_uc
+  [DTOs] as dto
+}
+
+package "DOMAIN" #LightYellow {
+  [Entities] as entities
+  [Value Objects] as vos
+  [Ports (Interfaces)] as ports
+}
+
+package "OUTBOUND ADAPTERS" #LightCoral {
+  [OracleCrucesRepo] as cruces
+  [OracleIncRepo] as inc
+  [OracleScoreRepo] as score
+  [OracleAnalisisRepo] as analisis
+  [LiteLLMAdapter] as llm
+  [MemoryCache] as cache
+  [OraclePool] as bd
+}
+
+routers --> analizar_uc : llama
+routers --> score_uc : llama
+analizar_uc --> ports : depende de
+score_uc --> ports : depende de
+
+ports <|.. cruces : implementa
+ports <|.. inc : implementa
+ports <|.. score : implementa
+ports <|.. analisis : implementa
+ports <|.. llm : implementa
+
+cruces --> bd : python-oracledb
+inc --> bd
+score --> bd
+analisis --> bd
+llm --> [LLM API] : litellm
+
+analizar_uc --> dto : retorna
+score_uc --> dto : retorna
+analizar_uc --> cache : check/guardar
+score_uc --> cache : check
+
+@enduml

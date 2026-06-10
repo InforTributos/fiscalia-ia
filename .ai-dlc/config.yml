@@ -1,0 +1,51 @@
+# AI-DLC Project Configuration
+
+project:
+  name: fiscalia-ia
+  version: 2.0.0
+  methodology: ai-dlc-2026
+  mode: hitl
+
+hats:
+  default_workflow: default
+  available:
+    - planner
+    - builder
+    - reviewer
+    - test-writer
+    - implementer
+
+units:
+  - id: U-01
+    name: Fundacion
+    slug: fundacion
+    depends_on: []
+  - id: U-02
+    name: Contrato PLSQL
+    slug: contrato-plsql
+    depends_on: [U-01]
+  - id: U-03
+    name: Use Cases y LLM
+    slug: use-cases-llm
+    depends_on: [U-02]
+  - id: U-04
+    name: Pruebas LLM Real
+    slug: pruebas-llm-real
+    depends_on: [U-03]
+  - id: U-05
+    name: Caching y Resiliencia
+    slug: caching-resiliencia
+    depends_on: [U-04]
+  - id: U-06
+    name: Tests y Documentacion
+    slug: tests-documentacion
+    depends_on: [U-05]
+
+quality_gates:
+  - test_coverage: ">= 75"
+  - stress_test: "50 users, p95 < 90s"
+  - no_hardcoded_secrets: true
+  - openapi_enabled: true
+  - cache_ttl_seconds: 3600
+  - retry_attempts: 3
+  - llm_timeout_seconds: 60

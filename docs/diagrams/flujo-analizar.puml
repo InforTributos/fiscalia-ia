@@ -1,0 +1,82 @@
+@startuml flujo-analizar
+!theme plain
+skinparam backgroundColor white
+
+actor "APEX" as apex
+participant "FastAPI\n/api/v1/analizar/{nit}" as api
+participant "AnalizarContribuyente\n(Use Case)" as uc
+participant "OracleCruceRepo\n(Adapter)" as cruce
+participant "OracleIncRepo\n(Adapter)" as inc
+participant "OracleScoreRepo\n(Adapter)" as score
+participant "OracleAnalisisRepo\n(Adapter)" as repo
+participant "LiteLLMAdapter\n(LLM)" as llm
+database "Oracle DB\nPL/SQL" as oracle
+participant "NVIDIA NIM\n/ Hugging Face" as llm_api
+
+== Inicio ==
+apex -> api: POST /analizar/9003189639?periodo=2025-01\nX-API-Key: xxx
+activate api
+
+api -> api: Validar API Key
+note right: middleware/auth.py
+
+api -> uc: ejecutar(nit, periodo)
+activate uc
+
+== Fase 1: Obtener cruces ==
+uc -> cruce: obtener_cruces(nit, periodo)
+activate cruce
+cruce -> oracle: callfunc FISCAL_CROSS.obtener_cruces()
+activate oracle
+oracle --> cruce: SYS_REFCURSOR
+deactivate oracle
+cruce --> uc: list[dict]
+deactivate cruce
+
+== Fase 2: Obtener inconsistencias ==
+uc -> inc: obtener_inconsistencias(nit, periodo)
+activate inc
+inc -> oracle: callfunc FISCAL_INC.obtener_inconsistencias()
+activate oracle
+oracle --> inc: SYS_REFCURSOR
+deactivate oracle
+inc --> uc: list[dict]
+deactivate inc
+
+== Fase 3: Obtener SRF ==
+uc -> score: obtener_srf(nit, periodo)
+activate score
+score -> oracle: callfunc FISCAL_SCORE.obtener_srf()
+activate oracle
+oracle --> score: SYS_REFCURSOR
+deactivate oracle
+score --> uc: dict
+deactivate score
+
+== Fase 4: Llamar LLM ==
+uc -> llm: analizar(contexto)
+activate llm
+llm -> llm_api: litellm.Router.completion()
+activate llm_api
+llm_api --> llm: JSON response
+deactivate llm_api
+llm --> uc: dict
+deactivate llm
+
+== Fase 5: Persistir ==
+uc -> repo: guardar_analisis(nit, periodo, prompt, respuesta)
+activate repo
+repo -> oracle: callfunc FISCAL_ANALISIS_IA.guardar()
+activate oracle
+oracle --> repo: OK
+deactivate oracle
+repo --> uc: id
+deactivate repo
+
+== Fin ==
+uc --> api: AnalisisDTO
+deactivate uc
+api --> apex: JSON Response
+deactivate api
+
+@enduml
