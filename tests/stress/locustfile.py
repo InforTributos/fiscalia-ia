@@ -1,4 +1,4 @@
-from locust import HttpUser, task, between
+from locust import HttpUser, between, task
 
 
 class FiscalIAUser(HttpUser):
@@ -23,6 +23,7 @@ class FiscalIAUser(HttpUser):
     @task
     def health_check(self):
         self.client.get("/api/v1/health")
+
 
 # Ejecutar:
 # locust -f tests/stress/locustfile.py --host=http://localhost:8000 --headless --users 100 --spawn-rate 10 --run-time 5m

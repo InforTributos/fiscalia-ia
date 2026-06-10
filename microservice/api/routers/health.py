@@ -1,9 +1,11 @@
 import time
-from fastapi import APIRouter, Depends
-from infrastructure.persistence.connection import verificar_conexion
-from infrastructure.adapters.cache.memory_cache import MemoryCache
-from api.deps import get_cache
+
 from config import settings
+from fastapi import APIRouter, Depends
+from infrastructure.adapters.cache.memory_cache import MemoryCache
+from infrastructure.persistence.connection import verificar_conexion
+
+from api.deps import get_cache
 
 router = APIRouter()
 

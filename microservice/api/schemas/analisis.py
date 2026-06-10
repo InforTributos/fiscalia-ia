@@ -1,13 +1,12 @@
 from pydantic import BaseModel
-from typing import Optional
 
 
 class HallazgoDTO(BaseModel):
     tipo: str
     severidad: str
     descripcion: str
-    diferencia: Optional[float] = None
-    ciiu: Optional[str] = None
+    diferencia: float | None = None
+    ciiu: str | None = None
 
 
 class AnalisisResponse(BaseModel):

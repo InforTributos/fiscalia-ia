@@ -1,6 +1,6 @@
-import pytest
-from infrastructure.adapters.cache.memory_cache import MemoryCache
 import time
+
+from infrastructure.adapters.cache.memory_cache import MemoryCache
 
 
 def test_cache_guardar_y_obtener():

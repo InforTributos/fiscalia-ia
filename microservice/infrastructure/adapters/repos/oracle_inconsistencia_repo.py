@@ -1,8 +1,10 @@
-import oracledb
 import logging
+
+import oracledb
+from domain.ports.inconsistencia_repo import InconsistenciaRepo
 from domain.value_objects.nit import NIT
 from domain.value_objects.periodo import Periodo
-from domain.ports.inconsistencia_repo import InconsistenciaRepo
+
 from infrastructure.persistence.connection import get_pool
 
 logger = logging.getLogger(__name__)

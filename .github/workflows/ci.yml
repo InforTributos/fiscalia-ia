@@ -1,0 +1,47 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - run: ruff check microservice/ tests/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install -r microservice/requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx factory-boy hypothesis pytest-html
+      - name: Run unit tests with coverage
+        run: |
+          PYTHONPATH=microservice pytest tests/unit/ \
+            --cov=microservice \
+            --cov-report=term \
+            --cov-report=html \
+            --cov-fail-under=80 \
+            --html=reports/pytest-report.html \
+            --self-contained-html
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: htmlcov/
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pytest-report
+          path: reports/pytest-report.html

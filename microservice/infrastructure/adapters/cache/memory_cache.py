@@ -1,7 +1,7 @@
-from typing import Optional
-from config import settings
-import time
 import logging
+import time
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ class MemoryCache:
         self._cache: dict[str, tuple[float, object]] = {}
         self.ttl = settings.cache_ttl_seconds
 
-    def obtener(self, key: str) -> Optional[object]:
+    def obtener(self, key: str) -> object | None:
         if key in self._cache:
             ts, valor = self._cache[key]
             if time.time() - ts < self.ttl:

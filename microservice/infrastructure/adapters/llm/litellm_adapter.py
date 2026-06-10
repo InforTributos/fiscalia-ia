@@ -1,10 +1,12 @@
 import logging
-from litellm import Router
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from domain.ports.llm_port import LLMPort
-from config import settings
-from infrastructure.adapters.llm.prompts import Prompts
+
 import litellm
+from config import settings
+from domain.ports.llm_port import LLMPort
+from litellm import Router
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+from infrastructure.adapters.llm.prompts import Prompts
 
 logger = logging.getLogger(__name__)
 
@@ -13,28 +15,32 @@ class LiteLLMAdapter(LLMPort):
     def __init__(self):
         model_list = []
 
-        model_list.append({
-            "model_name": "primary",
-            "litellm_params": {
-                "model": f"{settings.llm_primary_provider}/{settings.llm_primary_model}",
-                "api_key": settings.llm_primary_api_key,
-                "temperature": 0.1,
-                "timeout": settings.llm_timeout,
-            },
-        })
+        model_list.append(
+            {
+                "model_name": "primary",
+                "litellm_params": {
+                    "model": f"{settings.llm_primary_provider}/{settings.llm_primary_model}",
+                    "api_key": settings.llm_primary_api_key,
+                    "temperature": 0.1,
+                    "timeout": settings.llm_timeout,
+                },
+            }
+        )
         if settings.llm_primary_api_base:
             model_list[-1]["litellm_params"]["api_base"] = settings.llm_primary_api_base
 
         if settings.llm_mode == "primary_fallback" and settings.llm_fallback_provider:
-            model_list.append({
-                "model_name": "fallback",
-                "litellm_params": {
-                    "model": f"{settings.llm_fallback_provider}/{settings.llm_fallback_model}",
-                    "api_key": settings.llm_fallback_api_key,
-                    "temperature": 0.1,
-                    "timeout": settings.llm_timeout,
-                },
-            })
+            model_list.append(
+                {
+                    "model_name": "fallback",
+                    "litellm_params": {
+                        "model": f"{settings.llm_fallback_provider}/{settings.llm_fallback_model}",
+                        "api_key": settings.llm_fallback_api_key,
+                        "temperature": 0.1,
+                        "timeout": settings.llm_timeout,
+                    },
+                }
+            )
 
         fallbacks = [{"primary": ["fallback"]}] if len(model_list) > 1 else []
         self.router = Router(model_list=model_list, fallbacks=fallbacks)
@@ -43,16 +49,16 @@ class LiteLLMAdapter(LLMPort):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=2, min=2, max=30),
-        retry=retry_if_exception_type(
-            (litellm.APIError, litellm.Timeout, litellm.RateLimitError)
-        ),
+        retry=retry_if_exception_type((litellm.APIError, litellm.Timeout, litellm.RateLimitError)),
     )
     async def analizar(self, contexto: dict) -> dict:
         prompt = self.prompts.construir(contexto)
-        logger.info("LiteLLM: enviando análisis tipo %s a %s/%s",
-                     contexto.get("tipo", "desconocido"),
-                     settings.llm_primary_provider,
-                     settings.llm_primary_model)
+        logger.info(
+            "LiteLLM: enviando análisis tipo %s a %s/%s",
+            contexto.get("tipo", "desconocido"),
+            settings.llm_primary_provider,
+            settings.llm_primary_model,
+        )
 
         try:
             response = await self.router.acompletion(
@@ -74,8 +80,10 @@ class LiteLLMAdapter(LLMPort):
             resultado = self.prompts.parsear_respuesta(response.choices[0].message.content)
             resultado["tokens_entrada"] = getattr(response.usage, "prompt_tokens", 0)
             resultado["tokens_salida"] = getattr(response.usage, "completion_tokens", 0)
-            logger.info("LiteLLM: análisis completado (%d tokens)",
-                         resultado.get("tokens_entrada", 0) + resultado.get("tokens_salida", 0))
+            logger.info(
+                "LiteLLM: análisis completado (%d tokens)",
+                resultado.get("tokens_entrada", 0) + resultado.get("tokens_salida", 0),
+            )
             return resultado
 
         except Exception as e:

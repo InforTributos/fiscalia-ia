@@ -1,17 +1,19 @@
-import time
 import logging
-from domain.value_objects.nit import NIT
-from domain.value_objects.periodo import Periodo
-from domain.value_objects.dinero import Dinero
-from domain.value_objects.score_riesgo import ScoreRiesgo
-from domain.entities.hallazgo import Hallazgo
+import time
+
 from domain.entities.analisis import Analisis
+from domain.entities.hallazgo import Hallazgo
+from domain.ports.analisis_repo import AnalisisRepo, ScoreRepo
 from domain.ports.cruce_repo import CruceRepo
 from domain.ports.inconsistencia_repo import InconsistenciaRepo
-from domain.ports.analisis_repo import ScoreRepo, AnalisisRepo
 from domain.ports.llm_port import LLMPort
-from application.dto.analisis_dto import AnalisisDTO
+from domain.value_objects.dinero import Dinero
+from domain.value_objects.nit import NIT
+from domain.value_objects.periodo import Periodo
+from domain.value_objects.score_riesgo import ScoreRiesgo
 from infrastructure.adapters.cache.memory_cache import MemoryCache
+
+from application.dto.analisis_dto import AnalisisDTO
 
 logger = logging.getLogger(__name__)
 
@@ -89,15 +91,17 @@ class AnalizarContribuyente:
     def _mapear_hallazgos(self, inconsistencias: list[dict], enriquecidos: list[dict]) -> list[Hallazgo]:
         hallazgos = []
         for inc in inconsistencias:
-            hallazgos.append(Hallazgo(
-                tipo=inc.get("tipo_incidencia", "DESCONOCIDO"),
-                severidad=inc.get("severidad", "MEDIA"),
-                descripcion=inc.get("descripcion", ""),
-                diferencia=Dinero(inc.get("diferencia", 0)) if inc.get("diferencia") else None,
-                declarado=Dinero(inc.get("valor_declarado", 0)) if inc.get("valor_declarado") else None,
-                referencia=Dinero(inc.get("valor_referencia", 0)) if inc.get("valor_referencia") else None,
-                ciiu=inc.get("ciiu"),
-            ))
+            hallazgos.append(
+                Hallazgo(
+                    tipo=inc.get("tipo_incidencia", "DESCONOCIDO"),
+                    severidad=inc.get("severidad", "MEDIA"),
+                    descripcion=inc.get("descripcion", ""),
+                    diferencia=Dinero(inc.get("diferencia", 0)) if inc.get("diferencia") else None,
+                    declarado=Dinero(inc.get("valor_declarado", 0)) if inc.get("valor_declarado") else None,
+                    referencia=Dinero(inc.get("valor_referencia", 0)) if inc.get("valor_referencia") else None,
+                    ciiu=inc.get("ciiu"),
+                )
+            )
         return hallazgos
 
     def _to_dto(self, nit: NIT, periodo: Periodo, analisis: Analisis, inicio: float) -> AnalisisDTO:

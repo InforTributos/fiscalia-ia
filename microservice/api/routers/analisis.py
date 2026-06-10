@@ -1,6 +1,7 @@
+from application.use_cases.analizar_contribuyente import AnalisisDTO, AnalizarContribuyente
 from fastapi import APIRouter, Depends
+
 from api.deps import get_analizar_use_case
-from application.use_cases.analizar_contribuyente import AnalizarContribuyente, AnalisisDTO
 
 router = APIRouter()
 

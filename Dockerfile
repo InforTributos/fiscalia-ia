@@ -1,15 +1,22 @@
 FROM python:3.11-slim AS builder
 
-WORKDIR /app
+WORKDIR /build
 COPY microservice/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY . .
+COPY --from=builder /install /usr/local
+
+COPY microservice/ ./microservice/
+COPY docs/ ./docs/
+COPY db/ ./db/
+
+RUN adduser --disabled-password --no-create-home --uid 1000 fiscalia
+
+USER fiscalia
 
 EXPOSE 8000
 

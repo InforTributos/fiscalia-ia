@@ -1,5 +1,5 @@
-from fastapi import Header, HTTPException, Depends
 from config import settings
+from fastapi import Depends, Header, HTTPException
 
 
 async def verify_api_key(x_api_key: str = Header(...)):

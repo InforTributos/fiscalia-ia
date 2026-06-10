@@ -27,5 +27,8 @@ Thumbs.db
 # Logs
 *.log
 
+# Reports
+reports/
+
 # Docker
 .docker/

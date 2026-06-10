@@ -1,6 +1,7 @@
+import logging
+
 import oracledb
 from config import settings
-import logging
 
 logger = logging.getLogger(__name__)
 

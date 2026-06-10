@@ -1,17 +1,16 @@
-from fastapi import Depends
+from application.use_cases.analizar_contribuyente import AnalizarContribuyente
+from application.use_cases.calcular_score import CalcularScore
+from domain.ports.analisis_repo import AnalisisRepo, ScoreRepo
 from domain.ports.cruce_repo import CruceRepo
 from domain.ports.inconsistencia_repo import InconsistenciaRepo
-from domain.ports.analisis_repo import ScoreRepo, AnalisisRepo
 from domain.ports.llm_port import LLMPort
+from fastapi import Depends
+from infrastructure.adapters.cache.memory_cache import MemoryCache
+from infrastructure.adapters.llm.litellm_adapter import LiteLLMAdapter
+from infrastructure.adapters.repos.oracle_analisis_repo import OracleAnalisisRepo
 from infrastructure.adapters.repos.oracle_cruce_repo import OracleCruceRepo
 from infrastructure.adapters.repos.oracle_inconsistencia_repo import OracleInconsistenciaRepo
 from infrastructure.adapters.repos.oracle_score_repo import OracleScoreRepo
-from infrastructure.adapters.repos.oracle_analisis_repo import OracleAnalisisRepo
-from infrastructure.adapters.llm.litellm_adapter import LiteLLMAdapter
-from infrastructure.adapters.cache.memory_cache import MemoryCache
-from application.use_cases.analizar_contribuyente import AnalizarContribuyente
-from application.use_cases.calcular_score import CalcularScore
-
 
 _cache_instance: MemoryCache = None
 

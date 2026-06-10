@@ -19,21 +19,22 @@ class Prompts:
 Eres un asistente de fiscalización del Impuesto de Industria y Comercio (ICA) en Valledupar, Colombia.
 
 CONTRIBUYENTE:
-NIT: {ctx.get('nit')}
-Período: {ctx.get('periodo')}
+NIT: {ctx.get("nit")}
+Período: {ctx.get("periodo")}
 
 RESULTADOS CRUCE EXÓGENA VS DECLARADO:
-{json.dumps(ctx.get('cruces', []), indent=2, ensure_ascii=False)}
+{json.dumps(ctx.get("cruces", []), indent=2, ensure_ascii=False)}
 
 INCONSISTENCIAS DETECTADAS:
-{json.dumps(ctx.get('inconsistencias', []), indent=2, ensure_ascii=False)}
+{json.dumps(ctx.get("inconsistencias", []), indent=2, ensure_ascii=False)}
 
 SCORE DE RIESGO FISCAL:
-{json.dumps(ctx.get('srf', {}), indent=2, ensure_ascii=False)}
+{json.dumps(ctx.get("srf", {}), indent=2, ensure_ascii=False)}
 
 Genera un análisis JSON con:
 1. "explicacion": explicación del SRF y los factores de mayor riesgo (máx 3 párrafos)
-2. "hallazgos_enriquecidos": array con cada hallazgo incluyendo explicación en lenguaje natural y recomendación de acción
+2. "hallazgos_enriquecidos": array con cada hallazgo incluyendo explicación en lenguaje natural
+   y recomendación de acción
 """
 
     def _prompt_score(self, ctx: dict) -> str:
@@ -41,14 +42,15 @@ Genera un análisis JSON con:
 Eres un asistente de fiscalización del ICA en Valledupar, Colombia.
 
 CONTRIBUYENTE:
-NIT: {ctx.get('nit')}
-Período: {ctx.get('periodo')}
+NIT: {ctx.get("nit")}
+Período: {ctx.get("periodo")}
 
 SCORE DE RIESGO FISCAL:
-{json.dumps(ctx.get('srf', {}), indent=2, ensure_ascii=False)}
+{json.dumps(ctx.get("srf", {}), indent=2, ensure_ascii=False)}
 
 Genera un JSON con:
-1. "explicacion": explica el SRF en lenguaje natural para el funcionario fiscalizador, mencionando los 3 factores de mayor peso y su significado (máx 2 párrafos)
+1. "explicacion": explica el SRF en lenguaje natural para el funcionario fiscalizador,
+   mencionando los 3 factores de mayor peso y su significado (máx 2 párrafos)
 """
 
     def _prompt_generico(self, ctx: dict) -> str:

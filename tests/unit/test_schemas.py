@@ -1,4 +1,4 @@
-from api.schemas.analisis import HallazgoDTO, AnalisisResponse
+from api.schemas.analisis import AnalisisResponse, HallazgoDTO
 from api.schemas.contribuyente import Contribuyente
 from api.schemas.score import ComponenteSRFDTO, ScoreResponse
 
@@ -10,18 +10,19 @@ class TestSchemas:
         assert h.diferencia is None
 
     def test_hallazgo_dto_full(self):
-        h = HallazgoDTO(
-            tipo="SUBREGISTRO", severidad="ALTA", descripcion="test",
-            diferencia=70_000_000, ciiu="4711"
-        )
+        h = HallazgoDTO(tipo="SUBREGISTRO", severidad="ALTA", descripcion="test", diferencia=70_000_000, ciiu="4711")
         assert h.diferencia == 70_000_000
         assert h.ciiu == "4711"
 
     def test_analisis_response(self):
         r = AnalisisResponse(
-            nit="9003189639", periodo="2025-01", score_riesgo=85.0,
-            nivel_riesgo="ALTO", hallazgos=[], explicacion_srf="test",
-            tiempo_analisis_ms=100
+            nit="9003189639",
+            periodo="2025-01",
+            score_riesgo=85.0,
+            nivel_riesgo="ALTO",
+            hallazgos=[],
+            explicacion_srf="test",
+            tiempo_analisis_ms=100,
         )
         assert r.nit == "9003189639"
         assert r.cache_hit is False
@@ -42,8 +43,7 @@ class TestSchemas:
 
     def test_score_response(self):
         r = ScoreResponse(
-            nit="9003189639", srf=85.0, nivel="ALTO",
-            componentes=[], explicacion_ia="test", tiempo_analisis_ms=100
+            nit="9003189639", srf=85.0, nivel="ALTO", componentes=[], explicacion_ia="test", tiempo_analisis_ms=100
         )
         assert r.srf == 85.0
         assert r.nivel == "ALTO"

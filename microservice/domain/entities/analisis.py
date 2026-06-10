@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+
+from domain.entities.hallazgo import Hallazgo
 from domain.value_objects.nit import NIT
 from domain.value_objects.periodo import Periodo
 from domain.value_objects.score_riesgo import ScoreRiesgo
-from domain.entities.hallazgo import Hallazgo
 
 
 @dataclass

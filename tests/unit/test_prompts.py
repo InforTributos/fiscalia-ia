@@ -1,11 +1,16 @@
-import pytest
-from unittest.mock import Mock
 from infrastructure.adapters.llm.prompts import Prompts
 
 
 def test_prompt_analisis_incluye_nit_y_periodo():
     prompts = Prompts()
-    ctx = {"tipo": "analisis_completo", "nit": "9003189639", "periodo": "2025-01", "cruces": [], "inconsistencias": [], "srf": {"srf_total": 50}}
+    ctx = {
+        "tipo": "analisis_completo",
+        "nit": "9003189639",
+        "periodo": "2025-01",
+        "cruces": [],
+        "inconsistencias": [],
+        "srf": {"srf_total": 50},
+    }
     prompt = prompts.construir(ctx)
     assert "9003189639" in prompt
     assert "2025-01" in prompt

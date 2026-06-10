@@ -1,5 +1,6 @@
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock
 from application.use_cases.calcular_score import CalcularScore
 
 
@@ -7,8 +8,11 @@ from application.use_cases.calcular_score import CalcularScore
 async def test_calcular_score_retorna_componentes():
     mock_score = Mock()
     mock_score.obtener_srf.return_value = {
-        "srf_total": 72, "comp_exogena": 30, "comp_tarifa": 22,
-        "comp_omision": 15, "comp_rues": 5
+        "srf_total": 72,
+        "comp_exogena": 30,
+        "comp_tarifa": 22,
+        "comp_omision": 15,
+        "comp_rues": 5,
     }
     mock_llm = Mock()
     mock_llm.analizar = AsyncMock(return_value={"explicacion": "Los principales factores..."})
@@ -27,8 +31,11 @@ async def test_calcular_score_retorna_componentes():
 async def test_score_bajo_retorna_nivel_bajo():
     mock_score = Mock()
     mock_score.obtener_srf.return_value = {
-        "srf_total": 15, "comp_exogena": 5, "comp_tarifa": 5,
-        "comp_omision": 3, "comp_rues": 2
+        "srf_total": 15,
+        "comp_exogena": 5,
+        "comp_tarifa": 5,
+        "comp_omision": 3,
+        "comp_rues": 2,
     }
     mock_llm = Mock()
     mock_llm.analizar = AsyncMock(return_value={"explicacion": "Sin riesgo"})

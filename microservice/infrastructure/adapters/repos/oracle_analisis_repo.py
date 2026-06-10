@@ -1,8 +1,10 @@
-import oracledb
 import logging
+
+import oracledb
+from domain.ports.analisis_repo import AnalisisRepo
 from domain.value_objects.nit import NIT
 from domain.value_objects.periodo import Periodo
-from domain.ports.analisis_repo import AnalisisRepo
+
 from infrastructure.persistence.connection import get_pool
 
 logger = logging.getLogger(__name__)

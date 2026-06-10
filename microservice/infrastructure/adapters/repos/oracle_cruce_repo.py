@@ -1,8 +1,10 @@
-import oracledb
 import logging
+
+import oracledb
+from domain.ports.cruce_repo import CruceRepo
 from domain.value_objects.nit import NIT
 from domain.value_objects.periodo import Periodo
-from domain.ports.cruce_repo import CruceRepo
+
 from infrastructure.persistence.connection import get_pool
 
 logger = logging.getLogger(__name__)

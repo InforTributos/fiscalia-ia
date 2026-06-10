@@ -1,7 +1,7 @@
-import time
 import logging
+import time
+
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -17,12 +17,12 @@ class Settings(BaseSettings):
     llm_primary_provider: str = "nvidia_nim"
     llm_primary_model: str = "meta/llama-3.3-70b-instruct"
     llm_primary_api_key: str = "nvapi-..."
-    llm_primary_api_base: Optional[str] = "https://integrate.api.nvidia.com/v1"
+    llm_primary_api_base: str | None = "https://integrate.api.nvidia.com/v1"
 
-    llm_fallback_provider: Optional[str] = "nvidia_nim"
-    llm_fallback_model: Optional[str] = "meta/llama-3.2-3b-instruct"
-    llm_fallback_api_key: Optional[str] = "nvapi-..."
-    llm_fallback_api_base: Optional[str] = "https://integrate.api.nvidia.com/v1"
+    llm_fallback_provider: str | None = "nvidia_nim"
+    llm_fallback_model: str | None = "meta/llama-3.2-3b-instruct"
+    llm_fallback_api_key: str | None = "nvapi-..."
+    llm_fallback_api_base: str | None = "https://integrate.api.nvidia.com/v1"
 
     llm_max_tokens: int = 4096
     llm_timeout: int = 60
@@ -48,6 +48,7 @@ def setup_logging():
         def format(self, record):
             if isinstance(record.msg, dict):
                 import json
+
                 return json.dumps(record.msg, ensure_ascii=False)
             return super().format(record)
 

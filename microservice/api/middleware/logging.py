@@ -1,6 +1,7 @@
+import logging
 import time
 import uuid
-import logging
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -16,38 +17,44 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         query = str(request.url.query) if request.url.query else ""
 
-        logger.info({
-            "event": "request_start",
-            "request_id": request_id,
-            "method": method,
-            "path": path,
-            "query": query,
-        })
+        logger.info(
+            {
+                "event": "request_start",
+                "request_id": request_id,
+                "method": method,
+                "path": path,
+                "query": query,
+            }
+        )
 
         start = time.time()
         try:
             response: Response = await call_next(request)
         except Exception as exc:
             elapsed_ms = int((time.time() - start) * 1000)
-            logger.error({
-                "event": "request_error",
-                "request_id": request_id,
-                "method": method,
-                "path": path,
-                "status": 500,
-                "tiempo_ms": elapsed_ms,
-                "error": str(exc),
-            })
+            logger.error(
+                {
+                    "event": "request_error",
+                    "request_id": request_id,
+                    "method": method,
+                    "path": path,
+                    "status": 500,
+                    "tiempo_ms": elapsed_ms,
+                    "error": str(exc),
+                }
+            )
             raise
 
         elapsed_ms = int((time.time() - start) * 1000)
-        logger.info({
-            "event": "request_end",
-            "request_id": request_id,
-            "method": method,
-            "path": path,
-            "status": response.status_code,
-            "tiempo_ms": elapsed_ms,
-        })
+        logger.info(
+            {
+                "event": "request_end",
+                "request_id": request_id,
+                "method": method,
+                "path": path,
+                "status": response.status_code,
+                "tiempo_ms": elapsed_ms,
+            }
+        )
 
         return response

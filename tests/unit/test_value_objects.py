@@ -1,8 +1,8 @@
 import pytest
+from domain.value_objects.dinero import Dinero
 from domain.value_objects.nit import NIT
 from domain.value_objects.periodo import Periodo
 from domain.value_objects.score_riesgo import ScoreRiesgo
-from domain.value_objects.dinero import Dinero
 
 
 class TestNIT:

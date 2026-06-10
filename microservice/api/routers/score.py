@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
-from api.deps import get_calcular_score_use_case
 from application.use_cases.calcular_score import CalcularScore, ScoreDTO
+from fastapi import APIRouter, Depends
+
+from api.deps import get_calcular_score_use_case
 
 router = APIRouter()
 

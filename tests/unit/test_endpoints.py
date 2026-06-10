@@ -1,18 +1,5 @@
-import pytest
-from fastapi.testclient import TestClient
-from api.main import app
 from api.deps import get_cache
-
-
-@pytest.fixture
-def client():
-    return TestClient(app, raise_server_exceptions=False)
-
-
-@pytest.fixture(autouse=True)
-def cleanup_overrides():
-    yield
-    app.dependency_overrides.clear()
+from api.main import app
 
 
 def test_health_endpoint_degraded(client):

@@ -3,11 +3,12 @@
 Ejecutar con:
   PYTHONPATH=microservice pytest tests/integration/test_llm_real.py -v -x
 """
-import pytest
+
 import json
+
+import pytest
 from infrastructure.adapters.llm.litellm_adapter import LiteLLMAdapter
 from infrastructure.adapters.llm.prompts import Prompts
-
 
 pytestmark = [
     pytest.mark.integration,
@@ -58,7 +59,8 @@ async def test_fallback_nvidia_llama3_2_3b(adapter, prompts):
         else:
             assert resultado["tokens_entrada"] > 0
             assert resultado["tokens_salida"] > 0
-            print(f"NVIDIA llama-3.2-3b fallback OK: {resultado['tokens_entrada']} in / {resultado['tokens_salida']} out")
+            msg = f"llama-3.2-3b fallback OK: {resultado['tokens_entrada']} in / {resultado['tokens_salida']} out"
+            print(msg)
     finally:
         adapter.router.model_list[0]["litellm_params"]["api_key"] = original_key
 

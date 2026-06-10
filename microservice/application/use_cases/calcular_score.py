@@ -1,11 +1,12 @@
-import time
 import logging
+import time
 from dataclasses import dataclass
+
+from domain.ports.analisis_repo import ScoreRepo
+from domain.ports.llm_port import LLMPort
 from domain.value_objects.nit import NIT
 from domain.value_objects.periodo import Periodo
 from domain.value_objects.score_riesgo import ScoreRiesgo
-from domain.ports.analisis_repo import ScoreRepo
-from domain.ports.llm_port import LLMPort
 from infrastructure.adapters.cache.memory_cache import MemoryCache
 
 logger = logging.getLogger(__name__)
