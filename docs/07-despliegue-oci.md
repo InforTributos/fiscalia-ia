@@ -4,8 +4,8 @@
 
 - Oracle Cloud Infrastructure (OCI) tenant activo
 - Acceso a OCI Container Registry (OCIR)
-- Oracle Database 19c+ accesible desde la VCN
-- API Key de NVIDIA NIM
+- PostgreSQL 16+ accesible desde la VCN
+- API Keys: Anthropic/OpenAI (Tier 1), NVIDIA NIM (Tier 2), HuggingFace (Tier 3)
 
 ---
 
@@ -41,12 +41,25 @@ docker push <region>.ocir.io/<namespace>/fiscalia-ia:latest
 Configurar desde **OCI Vault** (no en texto plano):
 
 ```
-API_KEY=...
-ORACLE_DSN=...
-ORACLE_USER=...
-ORACLE_PASSWORD=...
-LLM_PRIMARY_API_KEY=...
-LLM_FALLBACK_API_KEY=...
+# PostgreSQL
+POSTGRES_HOST=10.0.1.100
+POSTGRES_PORT=5432
+POSTGRES_DB=fiscalia
+POSTGRES_USER=fiscalia
+POSTGRES_PASSWORD=
+
+# LLM Tier 1 (pago)
+LLM_TIER1_PROVIDER=anthropic
+LLM_TIER1_API_KEY=
+LLM_TIER1_MODEL=claude-sonnet-4-20250506
+
+# LLM Tier 2 (NVIDIA NIM)
+LLM_TIER2_API_KEY=
+LLM_TIER2_MODEL=qwen/qwen2.5-7b-instruct
+
+# LLM Tier 3 (HuggingFace)
+LLM_TIER3_API_KEY=
+LLM_TIER3_MODEL=Qwen/Qwen2.5-7B-Instruct
 ```
 
 ### 3.3. Health Check
@@ -79,8 +92,7 @@ APEX consume el microservicio mediante **Dynamic Actions**:
 1. Navegar a **Workspace Utilities → REST Data Sources**
 2. Crear nuevo REST Data Source
 3. URL: `http://<container-ip>:8000/api/v1`
-4. Autenticación: API Key en header `X-API-Key`
-5. Probar conexión con `GET /health`
+4. Probar conexión con `GET /health`
 
 ### 4.2. Llamar al Análisis
 
@@ -90,12 +102,9 @@ DECLARE
     l_response clob;
 BEGIN
     l_response := apex_web_service.make_rest_request(
-        p_url         => 'http://<container-ip>:8000/api/v1/analizar/9003189639?periodo=2025-01',
+        p_url         => 'http://<container-ip>:8000/api/v1/analizar/9003189639',
         p_http_method => 'POST',
-        p_username    => null,
-        p_password    => null,
-        p_api_key     => 'X-API-Key',
-        p_api_value   => 'abc123...'
+        p_body        => '{ "cliente_nit": "9003189639", "nit_objetivo": "9012345678" }'
     );
 END;
 ```
@@ -107,7 +116,7 @@ END;
 ### 5.1. Logs
 
 - OCI Logging recibe stdout del contenedor
-- Cada análisis genera un log estructurado con: `nit`, `periodo`, `tiempo_ms`, `tokens`, `cache_hit`, `modo_degradado`
+- Cada análisis genera un log estructurado con: `nit`, `periodo`, `tiempo_ms`, `tokens`, `cache_hit`, `provider`
 
 ### 5.2. Métricas
 
@@ -115,7 +124,7 @@ END;
 - Tokens consumidos por período
 - Cache hit ratio
 - Errores 5xx
-- Estado de conexión Oracle
+- Estado de conexión PostgreSQL
 
 ### 5.3. Alarmas sugeridas
 
@@ -123,7 +132,7 @@ END;
 |---|---|---|
 | Latencia > 90s | > 3 ocurrencias en 5 min | Notificar al equipo |
 | Errores 5xx | > 5 en 5 min | Notificar al equipo |
-| Conexión Oracle caída | 1 ocurrencia | Notificar al equipo |
+| Conexión PostgreSQL caída | 1 ocurrencia | Notificar al equipo |
 | Costo LLM mensual | > $100 USD | Revisar uso y optimizar prompts |
 
 ---

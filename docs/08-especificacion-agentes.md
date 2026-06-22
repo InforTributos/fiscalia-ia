@@ -4,14 +4,14 @@
 
 ## 1. AGT-00: Orchestrator
 
-**Responsabilidad:** Coordina el flujo entre agentes, gestiona expedientes, maneja HITL y la cola de trabajo del fiscalizador.
+**Responsabilidad:** Coordina el flujo entre agentes, gestiona la creación de procesos, background tasks y la cola de trabajo.
 
-**Implementación:** PL/SQL Package `FISCAL_ORCH` + Oracle APEX (dashboard).
+**Implementación:** `tasks/analisis_task.py` + `application/use_cases/orquestar_proceso.py`
 
-**Input:** Campaña de fiscalización.
-**Output:** Expedientes creados, flujo de análisis orquestado.
+**Input:** Criterios de fiscalización (vigencia, régimen, CIIU, período).
+**Output:** Proceso creado con análisis IA en background.
 
-**Relación con el microservicio:** El microservicio NO implementa AGT-00. Es responsabilidad del equipo APEX/PL-SQL.
+**Relación con el microservicio:** El microservicio implementa AGT-00 vía `asyncio.create_task()`. El proceso se lanza desde `POST /proceso`.
 
 ---
 
@@ -19,33 +19,37 @@
 
 **Responsabilidad:** Cruza información del contribuyente contra múltiples fuentes: exógena DIAN, RUES/Confecámaras y padrón ICA. Calcula los componentes base del Score de Riesgo Fiscal (SRF).
 
-### Alcance del Microservicio
+### Implementación
 
-El microservicio **consume** los resultados de AGT-01 a través de:
+| Componente | Archivo |
+|---|---|
+| Cálculo SRF (4 componentes) | `domain/services/crosscheck_service.py` — `calcular_srf()` |
+| Clasificación (omiso/exacto/inexacto) | `domain/services/crosscheck_service.py` — `clasificar_por_datos()` |
+| Extracción de inconsistencias | `domain/services/crosscheck_service.py` — `extraer_inconsistencias()` |
+| Nivel de riesgo | `domain/services/inconsistency_service.py` — `nivel_riesgo()` |
 
-- `FISCAL_CROSS.obtener_cruces(nit, periodo)` → Lista de cruces exógena vs ICA
-- `FISCAL_CROSS.obtener_srf_base(nit, periodo)` → SRF base sin explicación
-
-### Input (PL/SQL)
+### Input
 
 | Dato | Fuente |
 |---|---|
-| NIT del contribuyente | Tabla contribuyentes |
-| Ingresos declarados ICA | Tabla declaraciones_ica |
-| Ingresos reportados exógena | Tabla exogena (importada) |
-| Estado RUES | Web service RUES |
-| Tarifas CIIU vigentes | Tabla paramétrica municipal |
+| NIT del contribuyente | MCP Server vía `obtener_datos_fiscales` |
+| Ingresos declarados ICA | MCP Server (declaraciones_ica) |
+| Ingresos reportados exógena | MCP Server (exogena_dian) |
+| Estado RUES | MCP Server (rues_estado) |
+| Tarifas CIIU vigentes | `crosscheck_service.py` — `TARIFAS_CIIU` (provisional) |
 
-### Output (cursor PL/SQL)
+### Output
 
 ```json
 {
-  "ciiu": "4711",
-  "ingreso_declarado": 50000000,
-  "ingreso_exogena": 120000000,
-  "diferencia": 70000000,
-  "variacion_pct": 140,
-  "umbral_superado": 1
+  "srf_total": 78.5,
+  "componentes_srf": {
+    "diferencia_exogena": { "peso": 35, "valor": 28 },
+    "antiguedad_omision": { "peso": 20, "valor": 15 },
+    "discrepancia_tarifa_ciiu": { "peso": 25, "valor": 20 },
+    "estado_rues": { "peso": 20, "valor": 15 }
+  },
+  "nivel_riesgo": "ALTO"
 }
 ```
 
@@ -55,38 +59,35 @@ El microservicio **consume** los resultados de AGT-01 a través de:
 
 **Responsabilidad:** Detecta contribuyentes que no presentan declaraciones ICA en los períodos fiscalizables.
 
-**Implementación:** PL/SQL (queries directas + UTL_MATCH para fuzzy matching).
+**Implementación:** `domain/services/crosscheck_service.py` — `clasificar_por_datos()`
 
-**NO requiere microservicio.** No hay llamada a IA para esta función en V1.
+**Métodos de detección:**
 
-### Métodos de detección
-
-1. **Histórico:** Contribuyentes que declaraban y dejaron de hacerlo (2+ períodos)
-2. **RUES:** Empresas activas en RUES sin registro en padrón ICA
-3. **Fuzzy matching:** UTL_MATCH.JARO_WINKLER_SIMILARITY para detectar mismos contribuyentes con nombres ligeramente distintos
+1. **Histórico:** Contribuyentes con declaraciones ICA vacías (`declaraciones_ica: []`)
+2. **RUES vs padrón:** Empresas activas en RUES sin registro de declaraciones ICA
+3. **Clasificación:** Si no hay declaraciones → `OMISO`
 
 ---
 
 ## 4. AGT-03: InconsistencyAnalyzer
 
-**Responsabilidad:** Analiza declaraciones ICA para detectar inconsistencias: subdeclaración, tarifa incorrecta, período incorrecto, base cero, exenciones indebidas.
+**Responsabilidad:** Analiza declaraciones ICA para detectar inconsistencias: subdeclaración, tarifa incorrecta, base cero, exenciones indebidas.
 
-### Alcance del Microservicio
+### Implementación
 
-El microservicio:
-1. **Consume** `FISCAL_INC.obtener_inconsistencias(nit, periodo)` — lista de inconsistencias detectadas por PL/SQL
-2. **Enriquece** con IA: genera explicación en lenguaje natural y recomendación de acción vía LLM
+- `domain/services/crosscheck_service.py` — `extraer_inconsistencias()` para detectar anomalías
+- `domain/services/inconsistency_service.py` — `nivel_riesgo()` para asignar nivel
+- `infrastructure/llm/llm_service.py` — LLM genera explicación en lenguaje natural
 
 ### Tipos de Inconsistencia
 
 | Tipo | Código | Descripción |
 |---|---|---|
-| Subregistro de ingresos | `SUBREGISTRO` | Exógena reporta más ingresos que ICA |
-| Tarifa incorrecta | `TARIFA` | Tarifa aplicada no corresponde a la vigente |
-| Período incorrecto | `PERIODO` | Mezcla bimestres como anuales |
-| Exención indebida | `EXENCION` | Aplica exención sin soporte documental |
+| Subregistro de ingresos | `SUBDECLARACION_EXOGENA` | Exógena reporta más ingresos que ICA |
+| Tarifa incorrecta | `TARIFA_INCORRECTA` | Tarifa aplicada no corresponde a la vigente |
+| Período incorrecto | `PERIODO_INCORRECTO` | Mezcla bimestres como anuales |
+| Exención indebida | `EXENCION_IMPROCEDENTE` | Aplica exención sin soporte documental |
 | Base cero injustificada | `BASE_CERO` | Base gravable cero sin estado de inactividad |
-| Otra | `OTRA` | No clasificada en los tipos anteriores |
 
 ### Output del Microservicio
 
@@ -94,7 +95,7 @@ Por cada inconsistencia, el microservicio retorna:
 - Tipo y severidad
 - Valores (declarado, referencia, diferencia)
 - **Explicación IA** en lenguaje natural para el funcionario
-- **Recomendación de acción** (ej: "Verificar con el contribuyente la diferencia de $70M en CIIU 4711")
+- **Recomendación de acción**
 
 ---
 
@@ -102,18 +103,38 @@ Por cada inconsistencia, el microservicio retorna:
 
 **Responsabilidad:** Generación de Requerimientos Ordinarios, Emplazamientos para Declarar y Autos de Inspección.
 
-**Estado:** **DIFERIDO** — No incluido en V1. Requiere RAG normativo (Oracle AI Vector Search) y validación jurídica.
-
-**Versión objetivo:** SaaS v1.0 (Next AI Tech LLC).
+**Estado:** **DIFERIDO** — No incluido en V1. Requiere RAG normativo y validación jurídica.
 
 ---
 
-## 6. Matriz de Responsabilidades
+## 6. AGT-05: MCP Client
 
-| Agente | PL/SQL | APEX | Microservicio Python | Claude API |
-|---|---|---|---|---|
-| AGT-00 Orchestrator | ✅ | ✅ | ❌ | ❌ |
-| AGT-01 CrossCheck | ✅ | ❌ | ✅ (consumir) | ✅ (explicación SRF) |
-| AGT-02 OmisosDetect | ✅ | ✅ | ❌ | ❌ |
-| AGT-03 InconsistencyAnalyzer | ✅ | ❌ | ✅ (consumir + enriquecer) | ✅ (explicación hallazgos) |
-| AGT-04 LegalDraft | ❌ | ❌ | ❌ | ❌ (diferido) |
+**Responsabilidad:** Gestiona la conexión stdio con el MCP Server, paginación de resultados y filtrado de candidatos.
+
+**Implementación:** `infrastructure/mcp/oracle_adapter.py` + `pagination.py` + `classify.py`
+
+| Componente | Archivo |
+|---|---|
+| Cliente MCP stdio | `infrastructure/mcp/oracle_adapter.py` — `MCPClient` |
+| Paginación automática | `infrastructure/mcp/pagination.py` — `obtener_datos_fiscales()` |
+| Clasificación de candidatos | `infrastructure/mcp/classify.py` |
+
+**MCP Tools consumidas:**
+
+| Tool | Propósito |
+|---|---|
+| `buscar_contribuyentes` | Obtener NITs candidatos con score/razón |
+| `obtener_datos_fiscales` | Datos fiscales completos por NIT |
+
+---
+
+## 7. Matriz de Responsabilidades
+
+| Agente | Microservicio | LLM Provider | MCP Server |
+|---|---|---|---|
+| AGT-00 Orchestrator | ✅ | ❌ | ❌ |
+| AGT-01 CrossCheck | ✅ | ✅ (explicación SRF) | ✅ (datos) |
+| AGT-02 OmisosDetect | ✅ | ❌ | ✅ (datos) |
+| AGT-03 InconsistencyAnalyzer | ✅ | ✅ (explicación hallazgos) | ✅ (datos) |
+| AGT-04 LegalDraft | ❌ (diferido) | ❌ | ❌ |
+| AGT-05 MCP Client | ✅ | ❌ | ✅ (gestión conexión) |

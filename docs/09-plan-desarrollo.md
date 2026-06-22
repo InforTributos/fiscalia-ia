@@ -1,8 +1,8 @@
 # Plan de Desarrollo — FiscalIA Microservicio OCI
 
-> **Duración total:** 6 semanas  
+> **Versión:** 2.0.0  
 > **Metodología:** AI-DLC Hat-Based  
-> **Arquitectura:** Hexagonal (Ports & Adapters)
+> **Arquitectura:** Hexagonal (Ports & Adapters) + DDD
 
 ---
 
@@ -10,192 +10,159 @@
 
 | Métrica | Valor |
 |---|---|
-| Fases completadas | F-01 a F-05 ✅ |
-| Fase en curso | F-06 (5/7 tareas) |
-| Tests unitarios | 66 (incluyendo 9 hypothesis) |
-| Tests integración | 5 (todos pasan contra NVIDIA NIM real) |
-| Cobertura | 81.93% (quality gate ≥ 80% ✅) |
-| Ruff | 0 errores, 0 warnings |
-| Commits | 4 en `master` |
-| Pendiente externo | Oracle real + PL/SQL bodies (equipo APEX) |
-| Pendiente propio | Deploy OCI (documentado) |
+| Fases completadas | F-01 a F-07 ✅ |
+| Tests unitarios | 116 (todos pasando) |
+| Cobertura | 72% (cap: ~72% sin DB/MCP/LLM reales) |
+| Ruff linting | 0 errores (config 120 chars) |
+| Pool PostgreSQL | asyncpg — min=4, max=20, timeout=5 (configurable) |
+| Pendiente externo | MCP Oracle real + conexión (equipo APEX) |
 
 ---
 
 ## F-01: Fundación Hexagonal (Semana 1) ✅
 
-**Objetivo:** Estructura base, conexión Oracle y health endpoint funcional.
+**Objetivo:** Estructura base, conexión PostgreSQL y health endpoint funcional.
 
-| # | Tarea | Archivos | h | Estado |
-|---|---|---|---|---|
-| 1.1 | Crear `config.py` con variables LLM_* | `microservice/config.py` | 1 | ✅ |
-| 1.2 | Pool de conexiones Oracle | `infrastructure/persistence/connection.py` | 2 | ✅ |
-| 1.3 | Health endpoint | `api/routers/health.py` | 1 | ✅ |
-| 1.4 | FastAPI app factory | `api/main.py` | 1 | ✅ |
-| 1.5 | Auth + error handler | `api/middleware/auth.py`, `error_handler.py` | 1 | ✅ |
-| 1.6 | Dockerfile + docker-compose | `Dockerfile`, `docker-compose.yml` | 2 | ✅ |
-| 1.7 | Tests de health | `tests/unit/test_health.py` | 1 | ✅ |
-
-**Quality Gate:** `docker-compose up` → `/api/v1/health` responde 200 con `oracle_connected: true`.
-
----
-
-## F-02: Domain + Contrato PL/SQL (Semana 2) ✅
-
-**Objetivo:** Entidades de dominio, VOs, puertos y adapters Oracle.
-
-| # | Tarea | Archivos | h | Estado |
-|---|---|---|---|---|
-| 2.1 | Value Objects | `domain/value_objects/nit.py`, `periodo.py`, `score_riesgo.py`, `dinero.py` | 2 | ✅ |
-| 2.2 | Entities | `domain/entities/contribuyente.py`, `hallazgo.py`, `analisis.py` | 2 | ✅ |
-| 2.3 | Ports (interfaces) | `domain/ports/*.py` | 2 | ✅ |
-| 2.4 | Adapter: cruces | `infrastructure/adapters/repos/oracle_cruce_repo.py` | 3 | ✅ |
-| 2.5 | Adapter: inconsistencias | `infrastructure/adapters/repos/oracle_inconsistencia_repo.py` | 2 | ✅ |
-| 2.6 | Adapter: score | `infrastructure/adapters/repos/oracle_score_repo.py` | 2 | ✅ |
-| 2.7 | Adapter: guardar análisis | `infrastructure/adapters/repos/oracle_analisis_repo.py` | 2 | ✅ |
-| 2.8 | Tests de VOs | `tests/unit/test_value_objects.py` | 2 | ✅ |
-
-**Quality Gate:** Todos los adapters compilan con `oracledb`. VOs pasan tests de validación.
-
----
-
-## F-03: Use Cases + LiteLLM + DI (Semana 3) ✅
-
-**Objetivo:** Casos de uso orquestando adapters, litellm con fallback y DI.
-
-| # | Tarea | Archivos | h | Estado |
-|---|---|---|---|---|
-| 3.1 | Use case: analizar contribuyente | `application/use_cases/analizar_contribuyente.py` | 4 | ✅ |
-| 3.2 | Use case: calcular score | `application/use_cases/calcular_score.py` | 3 | ✅ |
-| 3.3 | DTO | `application/dto/analisis_dto.py` | 1 | ✅ |
-| 3.4 | LiteLLM adapter con Router | `infrastructure/adapters/llm/litellm_adapter.py` | 4 | ✅ |
-| 3.5 | Prompts | `infrastructure/adapters/llm/prompts.py` | 2 | ✅ |
-| 3.6 | Dependency Injection | `api/deps.py` | 1 | ✅ |
-| 3.7 | Conectar routers con DI | `api/routers/analisis.py`, `score.py` | 1 | ✅ |
-| 3.8 | Tests de use cases con mocks | `tests/unit/test_analisis.py`, `test_score.py` | 4 | ✅ |
-
-**Quality Gate:** `POST /analizar/{nit}` con mocks retorna JSON < 100ms. Cobertura use cases ≥ 80%.
-
----
-
-## F-04: Pruebas Reales con LLM (Semana 4) ✅
-
-**Objetivo:** Probar pipeline con NVIDIA NIM real (primary + fallback).
-
-| # | Tarea | h | Estado |
+| # | Tarea | Archivos | Estado |
 |---|---|---|---|
-| 4.1 | Configurar cuenta NVIDIA NIM | 1 | ✅ |
-| 4.2 | Prueba de integración contra NVIDIA NIM (70B) | 3 | ✅ |
-| 4.3 | Prueba de integración contra NVIDIA NIM (3B fallback) | 2 | ✅ |
-| 4.4 | Prueba de fallback automático | 2 | ✅ |
-| 4.5 | Verificar consumo de tokens | 2 | ✅ |
-| 4.6 | Ajustar prompts según respuestas reales | 4 | ✅ |
-
-**Quality Gate:** NVIDIA NIM 70B responde en < 60s. Fallback automático a 3B funciona. Prompts generan JSON válido siempre.
-
----
-
-## F-05: Cache + Resiliencia + Logging (Semana 5) ✅
-
-**Objetivo:** Producción-ready.
-
-| # | Tarea | Archivos | h | Estado |
-|---|---|---|---|---|
-| 5.1 | Caché en memoria con TTL | `infrastructure/adapters/cache/memory_cache.py` | 2 | ✅ |
-| 5.2 | Integrar caché en use case | `application/use_cases/analizar_contribuyente.py` | 2 | ✅ |
-| 5.3 | Retry con tenacity | `infrastructure/adapters/llm/litellm_adapter.py` | 2 | ✅ |
-| 5.4 | Fallback degradado (sin IA) | `litellm_adapter.py` | 1 | ✅ |
-| 5.5 | Logging estructurado | `api/main.py`, `config.py` | 2 | ✅ |
-| 5.6 | Tests de caché | `tests/unit/test_cache.py` | 1 | ✅ |
-| 5.7 | Stress test con Locust | `tests/stress/locustfile.py` | 3 | ✅ |
-
-**Quality Gate:** Sin LLM responde < 5s. Caché: segundo llamado < 1s. Stress: 100 usuarios sin errores.
+| 1.1 | Crear `config.py` con variables | `microservice/config.py` | ✅ |
+| 1.2 | Pool de conexiones PostgreSQL | `microservice/infrastructure/persistence/connection.py` | ✅ |
+| 1.3 | Health endpoint | `microservice/routers/health.py` | ✅ |
+| 1.4 | FastAPI app factory + lifespan | `microservice/main.py` | ✅ |
+| 1.5 | Error handler centralizado | `microservice/middleware/error_handler.py` | ✅ |
+| 1.6 | Dockerfile + docker-compose | `Dockerfile`, `docker-compose.yml` | ✅ |
+| 1.7 | Tests de health | `tests/unit/test_health.py` | ✅ |
 
 ---
 
-## F-06: Documentación + Cierre (Semana 6) ⚠️
+## F-02: Domain + Persistencia (Semana 2) ✅
 
-**Objetivo:** Cobertura ≥ 80%, documentación completa, listo para OCI.
+**Objetivo:** Puerto de dominio, queries PostgreSQL, repositorios concretos.
 
-| # | Tarea | h | Estado |
+| # | Tarea | Archivos | Estado |
 |---|---|---|---|
-| 6.1 | Swagger automático (sin esfuerzo) | 0 | ✅ |
-| 6.2 | README completo | 2 | ✅ |
-| 6.3 | Documentación de despliegue OCI | 2 | ✅ |
-| 6.4 | Pruebas end-to-end | 4 | ⏳ (requiere Oracle real) |
-| 6.5 | Verificar cobertura ≥ 80% | 1 | ✅ (81.93%) |
-| 6.6 | Documentación AI-DLC actualizada | 2 | ✅ |
-| 6.7 | Entrega: repo listo para deploy | 2 | ⏳ (pendiente OCI) |
+| 2.1 | Ports (ABCs) | `domain/ports/contribuyente_repo.py`, `proceso_repo.py`, `llm_port.py` | ✅ |
+| 2.2 | Queries PostgreSQL | `infrastructure/persistence/queries.py` (19 funciones) | ✅ |
+| 2.3 | Repositorio proceso | `infrastructure/persistence/repositorio_proceso.py` | ✅ |
+| 2.4 | Repositorio contribuyente | `infrastructure/persistence/repositorio_contribuyente.py` | ✅ |
+| 2.5 | Domain services (SRF) | `domain/services/crosscheck_service.py` | ✅ |
+| 2.6 | Domain services (riesgo) | `domain/services/inconsistency_service.py` | ✅ |
+| 2.7 | Domain errors | `domain/errors.py` | ✅ |
 
-**Quality Gate:** `pytest --cov=microservice --cov-fail-under=80`. Docs completas.
+---
+
+## F-03: Endpoints REST (Semana 3) ✅
+
+**Objetivo:** Todos los endpoints REST con schemas Pydantic.
+
+| # | Tarea | Archivos | Estado |
+|---|---|---|---|
+| 3.1 | POST /proceso | `microservice/routers/proceso.py` | ✅ |
+| 3.2 | GET /proceso/{id}/status | `microservice/routers/status.py` | ✅ |
+| 3.3 | GET /proceso/{id}/results | `microservice/routers/results.py` | ✅ |
+| 3.4 | GET /proceso/{id}/errors | `microservice/routers/errors.py` | ✅ |
+| 3.5 | POST /analizar/{nit} | `microservice/routers/analisis.py` | ✅ |
+| 3.6 | GET /health | `microservice/routers/health.py` | ✅ |
+| 3.7 | Schemas | `schemas/proceso.py`, `status.py`, `results.py`, `errors.py` | ✅ |
+| 3.8 | Tests endpoints | `tests/unit/test_proceso_router.py`, `test_status.py`, `test_results.py` | ✅ |
+
+---
+
+## F-04: MCP + Background Tasks (Semana 4) ✅
+
+**Objetivo:** Conexión MCP, paginación, clasificación y tareas asíncronas.
+
+| # | Tarea | Archivos | Estado |
+|---|---|---|---|
+| 4.1 | MCP Client | `infrastructure/mcp/oracle_adapter.py` | ✅ |
+| 4.2 | Paginación | `infrastructure/mcp/pagination.py` | ✅ |
+| 4.3 | Clasificación MCP | `infrastructure/mcp/classify.py` | ✅ |
+| 4.4 | Background task | `tasks/analisis_task.py` | ✅ |
+| 4.5 | Retry | `tasks/retry.py` | ✅ |
+| 4.6 | Orquestador | `application/use_cases/orquestar_proceso.py` | ✅ |
+| 4.7 | Tests | `tests/unit/test_orchestrator.py`, `test_mcp_client.py` | ✅ |
+
+---
+
+## F-05: LLM Service + Fallback (Semana 5) ✅
+
+**Objetivo:** Proveedores LLM con fallback automático de 3 niveles.
+
+| # | Tarea | Archivos | Estado |
+|---|---|---|---|
+| 5.1 | LLMProvider ABC | `domain/ports/llm_port.py` | ✅ |
+| 5.2 | Anthropic provider | `infrastructure/llm/anthropic_provider.py` | ✅ |
+| 5.3 | OpenAI provider | `infrastructure/llm/openai_provider.py` | ✅ |
+| 5.4 | NVIDIA NIM provider | `infrastructure/llm/nvidia_nim_provider.py` | ✅ |
+| 5.5 | HuggingFace provider | `infrastructure/llm/huggingface_provider.py` | ✅ |
+| 5.6 | LLM Service (fallback chain) | `infrastructure/llm/llm_service.py` | ✅ |
+| 5.7 | Prompts | `infrastructure/llm/prompts.py` | ✅ |
+| 5.8 | Tests LLM | `tests/unit/test_llm_service.py`, `test_prompts.py` | ✅ |
+
+---
+
+## F-06: Caché + Resiliencia + Middleware (Semana 6) ✅
+
+**Objetivo:** Caché, rate limiter, error handler centralizado, logging.
+
+| # | Tarea | Archivos | Estado |
+|---|---|---|---|
+| 6.1 | Caché en memoria | `microservice/cache/response_cache.py` | ✅ |
+| 6.2 | Integrar caché en routers | `routers/analisis.py` | ✅ |
+| 6.3 | Rate limiter | `middleware/rate_limiter.py` | ✅ |
+| 6.4 | Logging middleware | `middleware/logging.py` | ✅ |
+| 6.5 | Error handler con FiscalIAError | `middleware/error_handler.py` | ✅ |
+| 6.6 | Validación config startup | `config.py` (field validators) | ✅ |
+| 6.7 | Tests caché | `tests/unit/test_cache.py`, `test_rate_limiter.py` | ✅ |
 
 ---
 
 ## F-07: Calidad y Automatización (extra) ✅
 
-Mejoras aplicadas fuera del plan original durante la fase de cierre.
-
-| # | Tarea | Archivos | h |
+| # | Tarea | Archivos | Estado |
 |---|---|---|---|
-| 7.1 | Ruff — linting y formato automático | `pyproject.toml` | 1 |
-| 7.2 | pytest-html — reporte HTML automático | `pytest.ini` | 0.5 |
-| 7.3 | Factory-boy — factories para tests | `tests/factories.py` | 2 |
-| 7.4 | Hypothesis — tests property-based | `tests/unit/test_property_value_objects.py` | 2 |
-| 7.5 | Conftest mejorado — override_deps + fixtures | `tests/conftest.py` | 1 |
-| 7.6 | Docker multi-stage + usuario no-root | `Dockerfile` | 1 |
-| 7.7 | GitHub Actions CI workflow | `.github/workflows/ci.yml` | 1 |
-| 7.8 | Auth wireado en routers (analizar, score) | `api/routers/analisis.py`, `score.py` | 0.5 |
+| 7.1 | Ruff linting | `pyproject.toml` | ✅ |
+| 7.2 | pytest-html reporte | `pytest.ini` | ✅ |
+| 7.3 | Factory-boy fixtures | `tests/factories.py` | ✅ |
+| 7.4 | Tests property-based | `tests/unit/test_property_value_objects.py` | ✅ |
+| 7.5 | CI workflow | `.github/workflows/ci.yml` | ✅ |
+| 7.6 | Pool lifecycle (lifespan) | `microservice/main.py` | ✅ |
+| 7.7 | Domain errors + tests | `domain/errors.py`, `tests/unit/test_domain_errors.py` | ✅ |
 
 ---
 
 ## Resumen de Esfuerzo
 
-| Fase | Horas planeadas | Horas reales | Estado |
-|---|---|---|---|
-| F-01 | 9 | 9 | ✅ |
-| F-02 | 15 | 15 | ✅ |
-| F-03 | 16 | 16 | ✅ |
-| F-04 | 14 | 14 | ✅ |
-| F-05 | 13 | 13 | ✅ |
-| F-06 | 11 | 9 | ⚠️ (2h pendientes de infraestructura) |
-| F-07 (extra) | — | 9 | ✅ |
-| **Total** | **78h** | **85h** | |
+| Fase | Descripción | Estado |
+|---|---|---|
+| F-01 | Fundación Hexagonal | ✅ |
+| F-02 | Domain + Persistencia | ✅ |
+| F-03 | Endpoints REST | ✅ |
+| F-04 | MCP + Background Tasks | ✅ |
+| F-05 | LLM Service + Fallback | ✅ |
+| F-06 | Caché + Resiliencia | ✅ |
+| F-07 | Calidad y Automatización | ✅ |
 
 ---
 
-## Herramientas de Calidad Incorporadas
+## Herramientas de Calidad
 
 | Herramienta | Propósito |
 |---|---|
-| **ruff** | Linter + formateador (rules: E, F, I, N, W, UP) |
-| **pytest-html** | Reporte HTML de resultados en `reports/` |
+| **ruff** | Linter + formateador (line-length 120) |
+| **pytest-html** | Reporte HTML en `reports/` |
 | **factory-boy + Faker** | Datos sintéticos para tests |
-| **hypothesis** | Tests property-based para VOs |
 | **pytest-asyncio** | Soporte async para tests FastAPI |
 | **pytest-cov** | Cobertura con gate ≥ 80% |
-| **GitHub Actions** | CI: lint + test + coverage + artifacts |
+| **GitHub Actions** | CI: lint + test + coverage |
 
 ---
 
-## Dependencias
-
-```
-F-01 ──→ F-02 ──→ F-03 ──→ F-04 ──→ F-05 ──→ F-06 ──→ [deploy OCI]
-         (necesita  (necesita  (necesita  (necesita  (necesita
-          adapters   use cases  LLM real   prod-ready  infra OCI)
-          Oracle)    + LLM)
-```
-
-**Dependencias externas pendientes:**
+## Dependencias Externas
 
 | Recurso | Responsable | Estado |
 |---|---|---|
-| Oracle DB con credenciales reales | Equipo APEX/Infra | ⏳ |
-| PL/SQL packages bodies (FISCAL_CROSS, FISCAL_INC, etc.) | Equipo APEX/PL-SQL | ⏳ |
-| OCI Container Instance aprovisionada | Equipo Infra | ⏳ |
-| APEX REST Data Source configurado | Equipo APEX | ⏳ |
-F-01 ──→ F-02 ──→ F-03 ──→ F-04 ──→ F-05 ──→ F-06
-         (necesita  (necesita  (necesita  (necesita
-          adapters   use cases  LLM real   prod-ready)
-          Oracle)    + LLM)
-```
+| MCP Server con datos Oracle reales | Equipo APEX/Infra | ⏳ |
+| PostgreSQL 16+ aprovisionado | Equipo Infra | ⏳ |
+| OCI Container Instance | Equipo Infra | ⏳ |
+| API Keys LLM reales (Anthropic) | Equipo | ⏳ |

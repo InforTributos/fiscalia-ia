@@ -10,50 +10,65 @@ Todas las variables se configuran en un archivo `.env` en la raíz del proyecto 
 |---|---|---|---|
 | `API_PORT` | No | `8000` | Puerto donde escucha el microservicio |
 | `API_HOST` | No | `0.0.0.0` | Host de escucha |
-| `API_KEY` | **Sí** | - | API Key para autenticar llamadas desde APEX |
 
-### 1.2. Oracle Database
-
-| Variable | Obligatorio | Default | Descripción |
-|---|---|---|---|
-| `ORACLE_DSN` | **Sí** | - | DSN de conexión: `host:puerto/servicio` |
-| `ORACLE_USER` | **Sí** | - | Usuario de base de datos |
-| `ORACLE_PASSWORD` | **Sí** | - | Contraseña |
-
-### 1.3. LLM
+### 1.2. PostgreSQL
 
 | Variable | Obligatorio | Default | Descripción |
 |---|---|---|---|
-| `LLM_MODE` | No | `primary_fallback` | `primary_only` o `primary_fallback` |
-| `LLM_PRIMARY_PROVIDER` | **Sí** | `nvidia_nim` | Proveedor primario (ver docs/06-llm) |
-| `LLM_PRIMARY_MODEL` | **Sí** | `meta/llama-3.3-70b-instruct` | Modelo primario |
-| `LLM_PRIMARY_API_KEY` | **Sí** | - | API Key del proveedor primario |
-| `LLM_PRIMARY_API_BASE` | No | `https://integrate.api.nvidia.com/v1` | URL base del proveedor (si aplica) |
-| `LLM_FALLBACK_PROVIDER` | No | `nvidia_nim` | Proveedor de respaldo |
-| `LLM_FALLBACK_MODEL` | No | `meta/llama-3.2-3b-instruct` | Modelo de respaldo (ligero 3B) |
-| `LLM_FALLBACK_API_KEY` | No | - | API Key del respaldo |
-| `LLM_MAX_TOKENS` | No | `4096` | Máximo de tokens por respuesta |
-| `LLM_TIMEOUT` | No | `60` | Timeout en segundos |
+| `POSTGRES_HOST` | **Sí** | `localhost` | Host de PostgreSQL |
+| `POSTGRES_PORT` | No | `5432` | Puerto de PostgreSQL |
+| `POSTGRES_DB` | **Sí** | `fiscalia` | Nombre de la base de datos |
+| `POSTGRES_USER` | **Sí** | `fiscalia` | Usuario |
+| `POSTGRES_PASSWORD` | **Sí** | - | Contraseña (validada contra placeholder `changeme`) |
 
-### 1.4. Caché
+### 1.3. LLM — Tier 1 (pago)
+
+| Variable | Obligatorio | Default | Descripción |
+|---|---|---|---|
+| `LLM_TIER1_PROVIDER` | **Sí** | `anthropic` | Proveedor: `anthropic` o `openai` |
+| `LLM_TIER1_API_KEY` | **Sí** | - | API Key (validada contra `changeme`) |
+| `LLM_TIER1_MODEL` | No | `claude-sonnet-4-20250506` | Modelo |
+
+### 1.4. LLM — Tier 2 (gratis, NVIDIA NIM)
+
+| Variable | Obligatorio | Default | Descripción |
+|---|---|---|---|
+| `LLM_TIER2_API_KEY` | **Sí** (si se usa) | - | API Key de NVIDIA NIM |
+| `LLM_TIER2_MODEL` | No | `qwen/qwen2.5-7b-instruct` | Modelo |
+
+### 1.5. LLM — Tier 3 (gratis, HuggingFace)
+
+| Variable | Obligatorio | Default | Descripción |
+|---|---|---|---|
+| `LLM_TIER3_API_KEY` | **Sí** (si se usa) | - | Token de HuggingFace |
+| `LLM_TIER3_MODEL` | No | `Qwen/Qwen2.5-7B-Instruct` | Modelo |
+
+### 1.6. Caché
 
 | Variable | Obligatorio | Default | Descripción |
 |---|---|---|---|
 | `CACHE_TTL_SECONDS` | No | `3600` | TTL de caché en segundos (1 hora) |
 
-### 1.5. Retry
+### 1.7. Retry
 
 | Variable | Obligatorio | Default | Descripción |
 |---|---|---|---|
 | `RETRY_MAX_ATTEMPTS` | No | `3` | Intentos máximos para llamadas LLM |
 | `RETRY_BACKOFF_FACTOR` | No | `2` | Factor de backoff exponencial |
-| `RETRY_TIMEOUT` | No | `60` | Timeout total de retry |
+| `RETRY_TIMEOUT` | No | `60` | Timeout total de retry en segundos |
 
-### 1.6. Logging
+### 1.8. Background Tasks
 
 | Variable | Obligatorio | Default | Descripción |
 |---|---|---|---|
-| `LOG_LEVEL` | No | `INFO` | Nivel de logging: DEBUG, INFO, WARNING, ERROR |
+| `MAX_CONCURRENT_PROCESSES` | No | `5` | Procesos simultáneos máximos |
+| `PROCESS_TIMEOUT_MINUTES` | No | `30` | Timeout por proceso en minutos |
+
+### 1.9. Logging
+
+| Variable | Obligatorio | Default | Descripción |
+|---|---|---|---|
+| `LOG_LEVEL` | No | `INFO` | Nivel: DEBUG, INFO, WARNING, ERROR |
 
 ---
 
@@ -63,52 +78,66 @@ Todas las variables se configuran en un archivo `.env` en la raíz del proyecto 
 # === API ===
 API_PORT=8000
 API_HOST=0.0.0.0
-API_KEY=abc123...
 
-# === ORACLE ===
-ORACLE_DSN=host:1521/service
-ORACLE_USER=user
-ORACLE_PASSWORD=pass
+# === PostgreSQL ===
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=fiscalia
+POSTGRES_USER=fiscalia
+POSTGRES_PASSWORD=
 
-# === LLM ===
-LLM_MODE=primary_fallback
-LLM_PRIMARY_PROVIDER=nvidia_nim
-LLM_PRIMARY_MODEL=meta/llama-3.3-70b-instruct
-LLM_PRIMARY_API_KEY=nvapi-...
-LLM_PRIMARY_API_BASE=https://integrate.api.nvidia.com/v1
-LLM_FALLBACK_PROVIDER=nvidia_nim
-LLM_FALLBACK_MODEL=meta/llama-3.2-3b-instruct
-LLM_FALLBACK_API_KEY=nvapi-...
-LLM_MAX_TOKENS=4096
-LLM_TIMEOUT=60
+# === LLM Tier 1 (pago) ===
+LLM_TIER1_PROVIDER=anthropic
+LLM_TIER1_API_KEY=
+LLM_TIER1_MODEL=claude-sonnet-4-20250506
 
-# === CACHE ===
+# === LLM Tier 2 (gratis — NVIDIA NIM) ===
+LLM_TIER2_API_KEY=
+LLM_TIER2_MODEL=qwen/qwen2.5-7b-instruct
+
+# === LLM Tier 3 (gratis — HuggingFace) ===
+LLM_TIER3_API_KEY=
+LLM_TIER3_MODEL=Qwen/Qwen2.5-7B-Instruct
+
+# === Cache ===
 CACHE_TTL_SECONDS=3600
 
-# === RETRY ===
+# === Retry ===
 RETRY_MAX_ATTEMPTS=3
 RETRY_BACKOFF_FACTOR=2
 RETRY_TIMEOUT=60
 
-# === LOG ===
+# === Background Tasks ===
+MAX_CONCURRENT_PROCESSES=5
+PROCESS_TIMEOUT_MINUTES=30
+
+# === Log ===
 LOG_LEVEL=INFO
 ```
 
 ---
 
-## 3. Consideraciones de Seguridad
+## 3. Validación al Startup
 
-- **Nunca** comitear el archivo `.env` al repositorio (está en `.gitignore`)
-- En **OCI Container Instance**, usar **OCI Vault** para almacenar las variables sensibles
-- Rotar `API_KEY` y `LLM_PRIMARY_API_KEY` periódicamente
-- `ORACLE_PASSWORD` debe cumplir la política de contraseñas de la base de datos
+`config.py` valida al arrancar que ninguna API key ni contraseña tenga el valor `"changeme"`. Si se detecta, levanta `ConfiguracionInvalidaError` con el nombre de la variable ofensiva.
+
+Esto evita despliegues accidentales con claves placeholder.
 
 ---
 
-## 4. Configuración por Ambiente
+## 4. Consideraciones de Seguridad
 
-| Ambiente | `LOG_LEVEL` | `CACHE_TTL` | `LLM_MODE` |
+- **Nunca** comitear el archivo `.env` al repositorio (está en `.gitignore`)
+- En **OCI Container Instance**, usar **OCI Vault** para almacenar variables sensibles
+- Rotar `LLM_TIER1_API_KEY`, `LLM_TIER2_API_KEY`, `LLM_TIER3_API_KEY` y `POSTGRES_PASSWORD` periódicamente
+- El placeholder `changeme` es rechazado automáticamente por pydantic
+
+---
+
+## 5. Configuración por Ambiente
+
+| Ambiente | `LOG_LEVEL` | `CACHE_TTL` | `MAX_CONCURRENT_PROCESSES` |
 |---|---|---|---|
-| Desarrollo | `DEBUG` | `60` (1 min) | `primary_only` |
-| Pruebas | `INFO` | `300` (5 min) | `primary_fallback` |
-| Producción | `INFO` | `3600` (1 hr) | `primary_fallback` |
+| Desarrollo | `DEBUG` | `60` (1 min) | `2` |
+| Pruebas | `INFO` | `300` (5 min) | `5` |
+| Producción | `INFO` | `3600` (1 hr) | `5` |
