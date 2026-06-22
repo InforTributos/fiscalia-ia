@@ -65,43 +65,48 @@ class ContribuyenteFactory(factory.Factory):
     direccion = factory.Faker("address", locale="es_CO")
 
 
-def hacer_cruce(**kwargs) -> dict:
-    """Construye un dict de cruce con valores por defecto."""
+def hacer_datos_mcp(**kwargs) -> dict:
     data = {
+        "nit": "9003189639",
+        "score_peso": 75.5,
+        "es_candidato": True,
+        "razon": "Diferencia de ingresos del 45%",
+        "razon_social": "COMERCIO XYZ S.A.S.",
         "ciiu": "4711",
-        "ingreso_declarado": 50_000_000,
-        "ingreso_exogena": 120_000_000,
-        "diferencia": 70_000_000,
-        "variacion_pct": 140,
-        "umbral_superado": 1,
+        "pagina": 1,
+    }
+    data.update(kwargs)
+    return data
+
+
+def hacer_datos_fiscales(**kwargs) -> dict:
+    data = {
+        "nit": "9003189639",
+        "razon_social": "COMERCIO XYZ S.A.S.",
+        "ciiu": "4711",
+        "regimen": "COMUN",
+        "declaraciones_ica": [
+            {"periodo": "2024-B1", "base_gravable": 50000000, "tarifa": 0.01, "impuesto": 500000},
+        ],
+        "exogena_dian": [
+            {"periodo": "2024", "ingresos": 120000000},
+        ],
+        "rues_estado": "ACTIVO",
+        "rues_fecha_constitucion": "2015-03-15",
     }
     data.update(kwargs)
     return data
 
 
 def hacer_inconsistencia(**kwargs) -> dict:
-    """Construye un dict de inconsistencia con valores por defecto."""
     data = {
         "tipo_incidencia": "SUBREGISTRO",
         "ciiu": "4711",
         "descripcion": "Subdeclaración detectada",
-        "valor_declarado": 50_000_000,
-        "valor_referencia": 120_000_000,
-        "diferencia": 70_000_000,
+        "valor_declarado": 50000000,
+        "valor_referencia": 120000000,
+        "diferencia": 70000000,
         "severidad": "ALTA",
-    }
-    data.update(kwargs)
-    return data
-
-
-def hacer_srf(**kwargs) -> dict:
-    """Construye un dict de SRF con valores por defecto."""
-    data = {
-        "srf_total": 85,
-        "comp_exogena": 35,
-        "comp_tarifa": 25,
-        "comp_omision": 20,
-        "comp_rues": 5,
     }
     data.update(kwargs)
     return data

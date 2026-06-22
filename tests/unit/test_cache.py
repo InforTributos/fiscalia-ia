@@ -1,6 +1,6 @@
 import time
 
-from infrastructure.adapters.cache.memory_cache import MemoryCache
+from cache.response_cache import MemoryCache
 
 
 def test_cache_guardar_y_obtener():

@@ -1,4 +1,4 @@
-from api.main import app
+from main import app
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -10,6 +10,7 @@ def test_health_endpoint_retorna_200():
     data = response.json()
     assert "status" in data
     assert "version" in data
+    assert "checks" in data
 
 
 def test_root_endpoint_retorna_info():
