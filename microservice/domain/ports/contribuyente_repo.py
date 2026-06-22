@@ -1,9 +1,15 @@
 from abc import ABC, abstractmethod
 
-from domain.entities.contribuyente import Contribuyente
-from domain.value_objects.nit import NIT
-
 
 class ContribuyenteRepo(ABC):
     @abstractmethod
-    def obtener_por_nit(self, nit: NIT) -> Contribuyente: ...
+    async def obtener_por_nit(self, nit: str, periodo: str) -> dict | None:
+        ...
+
+    @abstractmethod
+    async def listar_candidatos(
+        self, vigencia_ini: str, vigencia_fin: str,
+        tipo_regimen: str, actividades_economicas: list[str],
+        periodo: str,
+    ):
+        ...

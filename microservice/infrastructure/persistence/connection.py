@@ -1,45 +1,43 @@
 import logging
 
-import oracledb
+import asyncpg
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-_pool = None
-_pool_attempted = False
+_pool: asyncpg.Pool | None = None
 
 
-def get_pool():
-    global _pool, _pool_attempted
-    if _pool is None and not _pool_attempted:
-        _pool_attempted = True
-        try:
-            logger.info("Creando pool de conexiones Oracle")
-            _pool = oracledb.create_pool(
-                user=settings.oracle_user,
-                password=settings.oracle_password,
-                dsn=settings.oracle_dsn,
-                min=2,
-                max=10,
-                increment=1,
-                getmode=oracledb.POOL_GETMODE_WAIT,
-                timeout=5,
-            )
-        except Exception as e:
-            logger.error("Error creando pool Oracle: %s", str(e))
-            _pool = None
+async def get_pool() -> asyncpg.Pool:
+    global _pool
+    if _pool is None:
+        logger.info("Creando pool asyncpg para PostgreSQL")
+        _pool = await asyncpg.create_pool(
+            host=settings.postgres_host,
+            port=settings.postgres_port,
+            database=settings.postgres_db,
+            user=settings.postgres_user,
+            password=settings.postgres_password,
+            min_size=settings.pool_min_size,
+            max_size=settings.pool_max_size,
+            timeout=settings.pool_timeout,
+        )
     return _pool
 
 
-def verificar_conexion() -> bool:
+async def close_pool():
+    global _pool
+    if _pool:
+        await _pool.close()
+        _pool = None
+
+
+async def verificar_conexion() -> bool:
     try:
-        pool = get_pool()
-        if pool is None:
-            return False
-        with pool.acquire() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM dual")
-                return True
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.fetchval("SELECT 1")
+            return True
     except Exception as e:
-        logger.error("Error conectando a Oracle: %s", str(e))
+        logger.error("Error conectando a PostgreSQL: %s", str(e))
         return False
