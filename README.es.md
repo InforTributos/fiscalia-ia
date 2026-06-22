@@ -1,6 +1,6 @@
 # FiscalIA — Microservicio Python
 
-> ![tests](https://img.shields.io/badge/tests-109-blue) ![coverage](https://img.shields.io/badge/coverage-72%25-yellow) ![python](https://img.shields.io/badge/python-3.14-blue)
+> ![tests](https://img.shields.io/badge/tests-116-blue) ![coverage](https://img.shields.io/badge/coverage-72%25-yellow) ![python](https://img.shields.io/badge/python-3.14-blue)
 
 Microservicio de IA para fiscalización del Impuesto de Industria y Comercio (ICA) en Valledupar, con arquitectura hexagonal/DDD y 4 proveedores LLM con fallback automático.
 
@@ -85,7 +85,7 @@ Cada request genera JSON por línea con `request_id` y `tiempo_ms`.
 |---|---|
 | Arquitectura | `docs/01-arquitectura.md` |
 | Modelo de datos | `docs/02-modelo-datos.md` |
-| Contrato PL/SQL (Oracle) | `docs/03-contrato-plsql.md` |
+| Contrato MCP | `docs/03-contrato-mcp.md` |
 | API Endpoints | `docs/04-api-endpoints.md` |
 | Configuración | `docs/05-configuracion.md` |
 | LLM Config | `docs/06-llm-configuracion.md` |
@@ -113,10 +113,14 @@ fiscalia-ia/
 ├── routers/              # Endpoints FastAPI
 ├── schemas/              # Pydantic models
 ├── tests/
-│   └── unit/             # 109+ tests
+│   └── unit/             # 116+ tests
 ├── docs/                 # Documentación
 ├── reports/              # Reportes pytest/cov
 ├── main.py               # Entry point
 ├── config.py             # Settings con validación
 └── .env.example
 ```
+
+## Licencia
+
+MIT — Ver [LICENSE](LICENSE) para detalles completos.

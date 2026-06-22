@@ -13,6 +13,15 @@ venv/
 
 # Environment
 .env
+.env.*
+!.env.example
+
+# Testing
+.pytest_cache/
+htmlcov/
+.hypothesis/
+.ruff_cache/
+.mypy_cache/
 
 # IDE
 .vscode/
@@ -23,6 +32,9 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Windows artifact
+nul
 
 # Logs
 *.log

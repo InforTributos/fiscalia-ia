@@ -21,20 +21,20 @@ units:
     slug: fundacion
     depends_on: []
   - id: U-02
-    name: Contrato PLSQL
-    slug: contrato-plsql
+    name: Conexion MCP y Persistencia
+    slug: mcp-persistencia
     depends_on: [U-01]
   - id: U-03
-    name: Use Cases y LLM
-    slug: use-cases-llm
+    name: Endpoints REST
+    slug: endpoints-rest
     depends_on: [U-02]
   - id: U-04
-    name: Pruebas LLM Real
-    slug: pruebas-llm-real
+    name: Orquestacion y Background Tasks
+    slug: orquestacion-tasks
     depends_on: [U-03]
   - id: U-05
-    name: Caching y Resiliencia
-    slug: caching-resiliencia
+    name: LLM Service y Fallback
+    slug: llm-service-fallback
     depends_on: [U-04]
   - id: U-06
     name: Tests y Documentacion
@@ -42,7 +42,7 @@ units:
     depends_on: [U-05]
 
 quality_gates:
-  - test_coverage: ">= 75"
+  - test_coverage: ">= 80"
   - stress_test: "50 users, p95 < 90s"
   - no_hardcoded_secrets: true
   - openapi_enabled: true
