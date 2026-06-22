@@ -1,19 +1,23 @@
 # FiscalIA — Microservicio Python OCI
 
+> ![coverage](https://img.shields.io/badge/coverage-81%25-green) ![tests](https://img.shields.io/badge/tests-80-blue) ![python](https://img.shields.io/badge/python-3.11-blue)
+
 Microservicio de IA para fiscalización del Impuesto de Industria y Comercio (ICA) en Valledupar.
 Orquesta agentes AGT-01 (CrossCheck) y AGT-03 (InconsistencyAnalyzer) con LLM agnóstico.
 
 ## Stack
 
 | Capa | Tecnología |
-|---|---|
+|---|---|---|
 | Framework | FastAPI (Python 3.11+) |
 | LLM | Agnóstico vía litellm Router (fallback automático) |
 | Base de datos | Oracle 19c+ (python-oracledb, solo PL/SQL) |
 | Arquitectura | Hexagonal (Ports & Adapters) |
 | Caché | En memoria con TTL configurable |
 | Logging | JSON estructurado por request (request_id, tiempo_ms) |
-| Despliegue | Docker / OCI Container Instance |
+| Calidad | ruff, pytest-cov (≥80%), pytest-html, factory-boy, hypothesis |
+| Despliegue | Docker multi-stage / OCI Container Instance |
+| CI/CD | GitHub Actions (lint + test + coverage) |
 | Metodología | AI-DLC Hat-Based |
 
 ## Endpoints
@@ -62,11 +66,14 @@ docker-compose up --build
 ## Tests
 
 ```bash
-# Unit tests (15 tests, cobertura ~75%)
-PYTHONPATH=microservice pytest tests/unit/ -v --cov=microservice
+# Unit tests (66 unitarios + 9 hypothesis)
+PYTHONPATH=microservice pytest tests/unit/ -v --cov=microservice --cov-report=html:reports/coverage
 
 # Integration tests (requiere API keys reales en .env)
 PYTHONPATH=microservice pytest tests/integration/ -v
+
+# Reporte HTML de resultados (se genera automáticamente en reports/)
+pytest --cov=microservice --cov-fail-under=80 --html=reports/test-report.html
 
 # Stress test
 locust -f tests/stress/locustfile.py --host=http://localhost:8000 --headless -u 50 -r 5 -t 2m
@@ -82,6 +89,18 @@ Cada request genera JSON por línea:
 ```
 
 Campos: `event`, `request_id`, `method`, `path`, `status`, `tiempo_ms`, `error` (si aplica).
+
+## Calidad y Automatización
+
+| Herramienta | Propósito |
+|---|---|
+| **ruff** | Linter y formateador — `ruff check .` debe pasar limpio |
+| **pytest-cov** | Cobertura mínima 80% — gate en CI |
+| **pytest-html** | Reporte HTML de resultados en `reports/` |
+| **factory-boy + Faker** | Factories reutilizables para tests |
+| **hypothesis** | Tests property-based para value objects (NIT, ScoreRiesgo, Dinero) |
+| **Locust** | Stress test con 100 usuarios simultáneos |
+| **GitHub Actions** | CI automático en cada push: lint → test → coverage |
 
 ## Documentación
 

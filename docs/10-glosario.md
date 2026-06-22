@@ -36,6 +36,8 @@
 
 | Término | Definición |
 |---|---|
+| **Factory** | Patrón de diseño para crear objetos. En tests, una factory genera instancias de datos sintéticos. |
+| **factory-boy** | Librería Python para crear factories con datos aleatorios (Faker). Usada en `tests/factories.py`. |
 | **Firmapp** | Solución de firma digital de Informática y Tributos S.A.S. |
 | **FISCALIA** | Nombre del módulo de fiscalización ICA con IA. |
 
@@ -45,6 +47,7 @@
 |---|---|
 | **Hat** | Sombrero. Rol que asume un agente IA en la metodología AI-DLC. Ejemplos: Planner, Builder, Reviewer. |
 | **HITL** | Human-in-the-Loop. Control obligatorio donde el funcionario revisa y aprueba las decisiones del agente IA antes de ejecutarlas. |
+| **hypothesis** | Librería Python para property-based testing. Genera cientos de casos de prueba automáticamente. |
 
 ## I
 
@@ -82,6 +85,7 @@
 |---|---|
 | **PL/SQL** | Procedural Language / Structured Query Language. Lenguaje procedural de Oracle. Toda la lógica de negocio de Taxation Smart está en PL/SQL. |
 | **Ports & Adapters** | Estilo arquitectónico hexagonal. Los puertos son interfaces (contratos), los adapters son implementaciones concretas. |
+| **Property-based testing** | Técnica donde se definen propiedades invariantes y el framework (hypothesis) genera casos aleatorios para verificarlas. |
 
 ## R
 
@@ -90,6 +94,7 @@
 | **RBAC** | Role-Based Access Control. Control de acceso basado en roles: FISCAL_ADMIN, FISCAL_SUPERVISOR, FISCAL_ANALISTA. |
 | **REST Data Source** | Recurso de Oracle APEX para consumir APIs REST externas. |
 | **RUES** | Registro Único Empresarial y Social. Directorio nacional de empresas registradas en Colombia, administrado por Confecámaras. |
+| **ruff** | Linter y formateador de Python. Reemplaza a flake8 + isort + black. |
 
 ## S
 
