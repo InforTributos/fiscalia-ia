@@ -1,28 +1,32 @@
 import logging
 import time
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     api_port: int = 8000
     api_host: str = "0.0.0.0"
-    api_key: str = "abc123..."
 
-    oracle_dsn: str = "host:1521/service"
-    oracle_user: str = "user"
-    oracle_password: str = "pass"
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_db: str = "fiscalia"
+    postgres_user: str = "fiscalia"
+    postgres_password: str = ""
 
-    llm_mode: str = "primary_fallback"
-    llm_primary_provider: str = "nvidia_nim"
-    llm_primary_model: str = "meta/llama-3.3-70b-instruct"
-    llm_primary_api_key: str = "nvapi-..."
-    llm_primary_api_base: str | None = "https://integrate.api.nvidia.com/v1"
+    llm_tier1_api_key: str = ""
+    llm_tier1_provider: str = "anthropic"
+    llm_tier1_model: str = "claude-sonnet-4-20250506"
+    llm_tier1_api_base: str | None = None
 
-    llm_fallback_provider: str | None = "nvidia_nim"
-    llm_fallback_model: str | None = "meta/llama-3.2-3b-instruct"
-    llm_fallback_api_key: str | None = "nvapi-..."
-    llm_fallback_api_base: str | None = "https://integrate.api.nvidia.com/v1"
+    llm_tier2_api_key: str = ""
+    llm_tier2_model: str = "qwen/qwen2.5-7b-instruct"
+    llm_tier2_api_base: str = "https://integrate.api.nvidia.com/v1"
+
+    llm_tier3_api_key: str = ""
+    llm_tier3_model: str = "Qwen/Qwen2.5-7B-Instruct"
+    llm_tier3_api_base: str = "https://api-inference.huggingface.co/v1"
 
     llm_max_tokens: int = 4096
     llm_timeout: int = 60
@@ -33,11 +37,32 @@ class Settings(BaseSettings):
     retry_backoff_factor: int = 2
     retry_timeout: int = 60
 
+    max_concurrent_processes: int = 5
+    process_timeout_minutes: int = 30
+
+    pool_min_size: int = 4
+    pool_max_size: int = 20
+    pool_timeout: int = 5
+
     log_level: str = "INFO"
 
     startup_time: float = time.time()
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+
+    @field_validator("llm_tier1_api_key", "llm_tier2_api_key", "llm_tier3_api_key")
+    @classmethod
+    def _validar_placeholder(cls, v: str) -> str:
+        if v and v.lower().startswith("changeme"):
+            raise ValueError(f"API key tiene valor placeholder 'changeme' — debe configurarse con una clave real")
+        return v
+
+    @field_validator("postgres_password")
+    @classmethod
+    def _validar_db_password(cls, v: str) -> str:
+        if v and v.lower().startswith("changeme"):
+            raise ValueError("POSTGRES_PASSWORD tiene valor placeholder 'changeme'")
+        return v
 
 
 settings = Settings()
@@ -48,7 +73,6 @@ def setup_logging():
         def format(self, record):
             if isinstance(record.msg, dict):
                 import json
-
                 return json.dumps(record.msg, ensure_ascii=False)
             return super().format(record)
 
