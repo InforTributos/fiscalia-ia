@@ -1,6 +1,9 @@
 from domain.services.crosscheck_service import (
-    calcular_srf, clasificar_por_datos, extraer_inconsistencias,
-    PESO_EXOGENA, PESO_OMISION, PESO_TARIFA, PESO_RUES,
+    PESO_OMISION,
+    PESO_RUES,
+    calcular_srf,
+    clasificar_por_datos,
+    extraer_inconsistencias,
 )
 
 

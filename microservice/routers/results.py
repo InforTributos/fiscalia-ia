@@ -1,9 +1,9 @@
 import uuid
 
-from domain.errors import ProcesoNoEncontradoError, ProcesoEnProcesoError
+from domain.errors import ProcesoEnProcesoError, ProcesoNoEncontradoError
 from fastapi import APIRouter, Query
 from infrastructure.persistence.repositorio_proceso import PostgresProcesoRepo
-from schemas.results import ResultsResponse, Paginacion, ResultadoDetalle, HallazgoResult
+from schemas.results import HallazgoResult, Paginacion, ResultadoDetalle, ResultsResponse
 
 router = APIRouter()
 repo = PostgresProcesoRepo()

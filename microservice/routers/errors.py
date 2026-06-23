@@ -1,9 +1,9 @@
 import uuid
 
 from domain.errors import ProcesoNoEncontradoError
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from infrastructure.persistence import queries
-from schemas.errors import ErrorsResponse, ErrorProceso, ErrorDetalle
+from schemas.errors import ErrorDetalle, ErrorProceso, ErrorsResponse
 
 router = APIRouter()
 

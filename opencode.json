@@ -1,0 +1,55 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "references": {
+    "docs": {
+      "path": "docs",
+      "description": "Documentación del proyecto: arquitectura, endpoints, configuración"
+    },
+    "domain": {
+      "path": ".ai-dlc/knowledge",
+      "description": "Conocimiento del dominio ICA, agentes, SRF"
+    },
+    "plans": {
+      "path": "../Planes de trabajo/fiscalIA",
+      "description": "Planes de implementación V1 y V2.1"
+    }
+  },
+  "agent": {
+    "fiscal-reviewer": {
+      "description": "Revisor de código fiscal — verifica arquitectura hexagonal, convenciones y seguridad",
+      "mode": "subagent",
+      "permission": { "edit": "deny" }
+    },
+    "domain-expert": {
+      "description": "Experto en dominio ICA — responde preguntas sobre fiscalización, SRF, MCP y agentes",
+      "mode": "subagent",
+      "permission": { "edit": "deny", "bash": "deny" }
+    }
+  },
+  "command": {
+    "test": {
+      "description": "Ejecutar tests unitarios",
+      "template": "PYTHONPATH=microservice pytest tests/unit/ -v $ARGUMENTS"
+    },
+    "lint": {
+      "description": "Verificar linting con ruff",
+      "template": "ruff check microservice/ tests/"
+    },
+    "coverage": {
+      "description": "Ejecutar tests con reporte de cobertura",
+      "template": "PYTHONPATH=microservice pytest tests/unit/ --cov=microservice --cov-report=term --cov-fail-under=80"
+    },
+    "dev": {
+      "description": "Iniciar servidor de desarrollo",
+      "template": "cd microservice && uvicorn main:app --reload"
+    },
+    "analyze": {
+      "description": "Analizar un NIT específico (./analyze <nit>)",
+      "template": "curl -s -X POST http://localhost:8000/api/v1/analizar/$1 -H 'Content-Type: application/json' -d '{\"cliente_nit\": \"9003189639\", \"periodo\": \"2024\"}' | python -m json.tool"
+    }
+  },
+  "skills": {
+    "paths": [".opencode/skills"]
+  }
+}

@@ -1,15 +1,15 @@
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
-from fiscal_mcp.client import MCPClient as MCPTransport
-from fiscal_mcp.pagination import paginar_contribuyentes, obtener_datos_fiscales
+from infrastructure.mcp.oracle_adapter import MCPClient
+from infrastructure.mcp.pagination import obtener_datos_fiscales, paginar_contribuyentes
 
 logger = logging.getLogger(__name__)
 
 
 class AGT05MCPClient:
-    def __init__(self, command: str = "python", args: list[str] | None = None):
-        self.client = MCPTransport(command=command, args=args)
+    def __init__(self):
+        self.client = MCPClient()
 
     async def buscar_contribuyentes(
         self,
@@ -33,4 +33,4 @@ class AGT05MCPClient:
         return await obtener_datos_fiscales(self.client, nit, periodo)
 
     async def close(self):
-        await self.client.disconnect()
+        pass

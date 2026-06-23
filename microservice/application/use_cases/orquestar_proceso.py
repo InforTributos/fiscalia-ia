@@ -8,10 +8,10 @@ from domain.services.crosscheck_service import (
 )
 from domain.services.inconsistency_service import nivel_riesgo
 from infrastructure.llm.llm_service import LLMService
-from infrastructure.llm.prompts import construir_prompt, parsear_respuesta
-from infrastructure.persistence.repositorio_proceso import PostgresProcesoRepo
+from infrastructure.llm.prompts import construir_prompt
 from infrastructure.mcp.oracle_adapter import MCPClient
 from infrastructure.mcp.pagination import obtener_datos_fiscales
+from infrastructure.persistence.repositorio_proceso import PostgresProcesoRepo
 
 logger = logging.getLogger(__name__)
 

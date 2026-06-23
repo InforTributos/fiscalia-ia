@@ -1,7 +1,12 @@
 from domain.errors import (
-    FiscalIAError, NITNoEncontradoError, ProcesoNoEncontradoError,
-    ClienteNoEncontradoError, ProcesoEnProcesoError, MCPConnectionError,
-    LLMUnavailableError, ConfiguracionInvalidaError,
+    ClienteNoEncontradoError,
+    ConfiguracionInvalidaError,
+    FiscalIAError,
+    LLMUnavailableError,
+    MCPConnectionError,
+    NITNoEncontradoError,
+    ProcesoEnProcesoError,
+    ProcesoNoEncontradoError,
 )
 
 

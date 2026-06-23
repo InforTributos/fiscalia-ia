@@ -1,7 +1,7 @@
-from domain.errors import NITNoEncontradoError, ProcesoNoEncontradoError, MCPConnectionError
-from main import app
+from domain.errors import MCPConnectionError, NITNoEncontradoError
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
+from main import app
 
 client = TestClient(app)
 

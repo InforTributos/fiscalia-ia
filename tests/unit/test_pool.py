@@ -13,7 +13,7 @@ async def reset_pool():
 
 @pytest.mark.asyncio
 async def test_get_pool_crea_pool_una_vez():
-    from infrastructure.persistence.connection import get_pool, close_pool
+    from infrastructure.persistence.connection import close_pool, get_pool
 
     pool_mock = AsyncMock()
 
@@ -33,7 +33,7 @@ async def test_get_pool_crea_pool_una_vez():
 
 @pytest.mark.asyncio
 async def test_close_pool_cierra_y_resetea():
-    from infrastructure.persistence.connection import get_pool, close_pool
+    from infrastructure.persistence.connection import close_pool, get_pool
 
     pool_mock = AsyncMock()
 
@@ -49,7 +49,7 @@ async def test_close_pool_cierra_y_resetea():
 
 @pytest.mark.asyncio
 async def test_verificar_conexion_ok():
-    from infrastructure.persistence.connection import verificar_conexion, close_pool
+    from infrastructure.persistence.connection import close_pool, verificar_conexion
 
     conn_mock = AsyncMock()
     conn_mock.fetchval = AsyncMock(return_value=1)
@@ -80,7 +80,7 @@ async def test_verificar_conexion_ok():
 
 @pytest.mark.asyncio
 async def test_verificar_conexion_fail():
-    from infrastructure.persistence.connection import verificar_conexion, close_pool
+    from infrastructure.persistence.connection import close_pool, verificar_conexion
 
     async def fake_create_pool(**kwargs):
         raise Exception("DB down")

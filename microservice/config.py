@@ -46,6 +46,12 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    mcp_server_url: str = ""
+    mcp_token_url: str = ""
+    mcp_db_user: str = ""
+    mcp_db_password: str = ""
+    mcp_timeout: int = 30
+
     startup_time: float = time.time()
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
@@ -54,7 +60,7 @@ class Settings(BaseSettings):
     @classmethod
     def _validar_placeholder(cls, v: str) -> str:
         if v and v.lower().startswith("changeme"):
-            raise ValueError(f"API key tiene valor placeholder 'changeme' — debe configurarse con una clave real")
+            raise ValueError("API key tiene valor placeholder 'changeme' — debe configurarse con una clave real")
         return v
 
     @field_validator("postgres_password")
@@ -62,6 +68,13 @@ class Settings(BaseSettings):
     def _validar_db_password(cls, v: str) -> str:
         if v and v.lower().startswith("changeme"):
             raise ValueError("POSTGRES_PASSWORD tiene valor placeholder 'changeme'")
+        return v
+
+    @field_validator("mcp_db_user", "mcp_db_password")
+    @classmethod
+    def _validar_mcp_creds(cls, v: str) -> str:
+        if v and v.lower().startswith("changeme"):
+            raise ValueError("MCP credential tiene valor placeholder 'changeme'")
         return v
 
 

@@ -3,16 +3,15 @@ from contextlib import asynccontextmanager
 from config import setup_logging
 from fastapi import FastAPI
 from infrastructure.persistence.connection import close_pool, get_pool
-
 from middleware.error_handler import register_error_handlers
 from middleware.logging import LoggingMiddleware
 from middleware.rate_limiter import RateLimiterMiddleware
+from routers.analisis import router as analisis_router
+from routers.errors import router as errors_router
 from routers.health import router as health_router
 from routers.proceso import router as proceso_router
-from routers.status import router as status_router
 from routers.results import router as results_router
-from routers.errors import router as errors_router
-from routers.analisis import router as analisis_router
+from routers.status import router as status_router
 
 setup_logging()
 

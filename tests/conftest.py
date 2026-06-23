@@ -4,8 +4,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "microservice"))
 
 import pytest
-from main import app
 from fastapi.testclient import TestClient
+from main import app
 
 
 @pytest.fixture(autouse=True)

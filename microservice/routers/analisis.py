@@ -3,9 +3,9 @@ import logging
 import time
 
 from cache import get_cache
+from domain.errors import NITNoEncontradoError
 from domain.services.crosscheck_service import calcular_srf, clasificar_por_datos, extraer_inconsistencias
 from domain.services.inconsistency_service import nivel_riesgo
-from domain.errors import NITNoEncontradoError
 from fastapi import APIRouter
 from infrastructure.llm.llm_service import LLMService
 from infrastructure.llm.prompts import construir_prompt

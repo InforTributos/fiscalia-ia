@@ -1,11 +1,10 @@
 import asyncio
 import logging
-import uuid
 
-from domain.errors import ProcesoEnProcesoError, FiscalIAError
+from domain.errors import FiscalIAError, ProcesoEnProcesoError
 from fastapi import APIRouter
 from infrastructure.persistence.repositorio_proceso import PostgresProcesoRepo
-from schemas.proceso import ProcesoRequest, ProcesoResponse, ProcesoResumen, ProcesoAnalisis
+from schemas.proceso import ProcesoAnalisis, ProcesoRequest, ProcesoResponse, ProcesoResumen
 from tasks.analisis_task import analizar_proceso
 
 logger = logging.getLogger(__name__)

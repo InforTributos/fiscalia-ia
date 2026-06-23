@@ -1,7 +1,6 @@
 import json
 import uuid
 
-import asyncpg
 from .connection import get_pool
 
 

@@ -1,21 +1,20 @@
 # Contrato MCP (Model Context Protocol)
 
-> **Reemplaza el anterior Contrato PL/SQL** (`docs/03-contrato-plsql.md`).  
-> Las tools del MCP Server sustituyen las funciones de los packages `FISCAL_CROSS`, `FISCAL_INC` y `FISCAL_SCORE`.
+> **Reemplaza el anterior Contrato PL/SQL** (`docs/03-contrato-plsql.md`).
+> El microservicio consume datos fiscales vía Oracle MCP Server remoto con transporte Streamable HTTP.
 
 ---
 
 ## 1. Overview
 
-El MCP Server expone dos tools que el microservicio Python consume vía el protocolo estándar MCP (Model Context Protocol) con transporte `stdio`. A diferencia del contrato PL/SQL anterior —donde el microservicio llamaba directamente funciones de Oracle mediante `python-oracledb.callfunc()`—, ahora el microservicio se comunica con un proceso MCP que encapsula el acceso a Oracle Database y retorna datos estructurados en JSON.
+El microservicio FiscalIA se comunica con Oracle Database exclusivamente a través del **Oracle MCP Server**, un servicio gestionado que expone tools PL/SQL genéricas vía el protocolo estándar MCP con transporte **Streamable HTTP + SSE**. A diferencia del contrato PL/SQL anterior —donde el microservicio llamaba directamente funciones de Oracle mediante `python-oracledb.callfunc()`—, ahora el microservicio envía peticiones HTTP autenticadas con Bearer Token al endpoint MCP de Oracle.
 
-| Package PL/SQL (anterior) | Tool MCP (nuevo) | Propósito |
+| Componente | Anterior | Actual |
 |---|---|---|
-| `FISCAL_CROSS.obtener_cruces` | `buscar_contribuyentes` | Obtener NITs candidatos con score/razón |
-| `FISCAL_CROSS.obtener_srf_base` | `obtener_datos_fiscales` + cálculo en MCP | Componentes SRF |
-| `FISCAL_INC.obtener_inconsistencias` | `obtener_datos_fiscales` | Anomalías e inconsistencias |
-| `FISCAL_SCORE.obtener_srf` | `obtener_datos_fiscales` + MCP score | Score de riesgo fiscal |
-| `FISCAL_ANALISIS_IA.guardar` | *(eliminado — persistencia en PostgreSQL)* | Almacenamiento de resultados IA |
+| Transporte | `stdio` (subprocess local) | Streamable HTTP (remoto) |
+| Autenticación | Ninguna | Bearer Token (OAuth 2.0 password grant) |
+| Tools | Custom (`buscar_contribuyentes`, `obtener_datos_fiscales`) | Genéricas (`EXECUTE_SQL`, `LIST_OBJECTS`, `LIST_SCHEMAS`) |
+| Librería cliente | `fastmcp.Client` | `mcp` SDK v1.28+ con `streamable_http_client` |
 
 ---
 
@@ -25,115 +24,167 @@ El MCP Server expone dos tools que el microservicio Python consume vía el proto
 ┌─────────────────────────────────────────────────────┐
 │                   OCI Container Instance             │
 │                                                      │
-│  ┌──────────────────────┐     stdio subprocess      │
-│  │   Microservicio      │ ◄───────────────────────  │
-│  │   (FastAPI + Python) │                           │
-│  │                      │   fastmcp.Client          │
-│  │   AGT-05 MCP Client  │ ──► call_tool()           │
-│  │   Pagination Loop    │ ──► discover_tools()      │
+│  ┌──────────────────────┐                           │
+│  │   Microservicio      │  HTTP POST (JSON-RPC 2.0) │
+│  │   (FastAPI + Python) │ ───────────────────────►  │
+│  │                      │   Authorization: Bearer   │
+│  │   MCPClient          │ ◄───────────────────────  │
+│  │   Pagination Loop    │   JSON-RPC Response       │
 │  └──────────────────────┘                           │
 │                                                      │
 └──────────────────┬──────────────────────────────────┘
                    │
-          stdio pipe (subprocess)
+           HTTPS (red privada OCI)
                    │
 ┌──────────────────▼──────────────────────────────────┐
-│                   MCP Server                         │
-│           (FastMCP — Oracle Database 19c+)           │
+│              Oracle MCP Server                       │
+│          (Oracle Database 23ai / 19c)                │
 │                                                      │
 │   Tools expuestas:                                   │
-│   • buscar_contribuyentes                            │
-│   • obtener_datos_fiscales                           │
+│   • EXECUTE_SQL  — ejecuta queries SQL               │
+│   • LIST_OBJECTS — explora esquemas                  │
+│   • LIST_SCHEMAS — lista esquemas disponibles        │
 │                                                      │
-│   Conexión: oracledb → Oracle Database               │
 └─────────────────────────────────────────────────────┘
 ```
 
-- **Transporte:** `stdio` — el microservicio lanza el MCP Server como subproceso y se comunica por stdin/stdout con mensajes JSON-RPC.
-- **Librería:** FastMCP v3.4.x (Python) — `fastmcp.Client` del lado del microservicio.
-- **Ciclo de vida:** El microservicio inicia el subproceso MCP al arrancar y lo mantiene vivo; si el proceso MCP muere, el microservicio lo reinicia automáticamente (hasta 3 reintentos).
+- **Transporte:** Streamable HTTP (POST + SSE) — el microservicio envía peticiones HTTP al endpoint MCP de Oracle y recibe respuestas JSON-RPC 2.0.
+- **Autenticación:** Bearer Token obtenido vía OAuth 2.0 Resource Owner Password Grant (`grant_type=password`).
+- **Librería:** `mcp` SDK v1.28+ — `streamable_http_client` para el transporte, `ClientSession` para tool calls.
+- **Ciclo de vida:** El microservicio obtiene un token fresco por cada llamada a tool. No hay conexión persistente.
 
 ---
 
-## 3. Tool: `buscar_contribuyentes`
+## 3. Autenticación
 
-### 3.1. Parámetros de entrada
+### 3.1. Obtener Token
 
-| Parámetro | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `vigencia_ini` | `string` (DATE) | Sí | Fecha inicial del período fiscal (YYYY-MM-DD) |
-| `vigencia_fin` | `string` (DATE) | Sí | Fecha final del período fiscal (YYYY-MM-DD) |
-| `tipo_regimen` | `string` | Sí | Tipo de régimen: `COMUN` o `SIMPLIFICADO` |
-| `actividades_economicas` | `array[string]` | Sí | Lista de códigos CIIU (ej: `["4711","4712"]`) |
-| `periodo` | `string` | Sí | Año fiscal (ej: `"2024"`) |
-| `page` | `integer` | No | Número de página (default: `1`) |
-| `page_size` | `integer` | No | Registros por página (default: `100`, max: `500`) |
+```
+POST {MCP_TOKEN_URL}
+Content-Type: application/x-www-form-urlencoded
 
-### 3.2. Output por NIT
+grant_type=password&username={user}&password={password}
+```
 
+**Respuesta:**
 ```json
 {
-  "nit": "9003189639",
-  "score_peso": 75.5,
-  "es_candidato": true,
-  "razon": "Diferencia de ingresos del 45% entre exógena y declarado ICA para CIIU 4711"
+  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600
 }
 ```
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `nit` | `string` | NIT del contribuyente (sin guiones ni DV) |
-| `score_peso` | `number` | Ponderación 0–100 calculada por el MCP |
-| `es_candidato` | `boolean` | `true` si el contribuyente supera el umbral de fiscalización |
-| `razon` | `string` | Razón textual que soporta la decisión (generada por el MCP con base en los cruces) |
-
-### 3.3. Paginación
-
-La tool implementa paginación obligatoria. El microservicio itera páginas secuencialmente hasta recibir una página vacía:
+### 3.2. Usar Token en llamadas MCP
 
 ```
-Request:    buscar_contribuyentes({..., page: 1, page_size: 100})
-Response:   [100 NITs]
-
-Request:    buscar_contribuyentes({..., page: 2, page_size: 100})
-Response:   [100 NITs]
-
-...
-
-Request:    buscar_contribuyentes({..., page: N, page_size: 100})
-Response:   []   ← página vacía → fin de la iteración
+POST {MCP_SERVER_URL}
+Authorization: Bearer {access_token}
+Content-Type: application/json
 ```
 
-**Políticas:**
-- El MCP Server debe retornar `[]` (arreglo vacío) cuando no hay más resultados.
-- Cada página debe completarse en menos de 5 segundos (RNF-10).
-- Si una página falla (timeout/error), el microservicio reintenta hasta 3 veces con backoff antes de marcar el proceso como `ERROR`.
-
-### 3.4. Lógica interna del MCP (`es_candidato`)
-
-El MCP Server aplica las siguientes reglas para determinar `es_candidato` y `score_peso`:
-
-| Criterio | Peso en score | Descripción |
-|---|---|---|
-| Cruce exógena vs declarado ICA | 35% | Diferencia > umbral configurable (default 15%) |
-| Antigüedad sin declarar | 20% | Meses desde la última declaración ICA |
-| Discrepancia tarifa CIIU | 25% | Tarifa aplicada vs tarifa legal según CIIU |
-| Estado RUES vs padrón ICA | 20% | Contribuyente activo en RUES pero omiso en ICA |
-
-`es_candidato = true` si `score_peso >= 50` (umbral configurable en el MCP Server).
+> [!note] Token TTL
+> El token es válido por 1 hora. El microservicio obtiene un token fresco en cada llamada a tool. Para producción, se recomienda cachear el token y refrescarlo solo cuando expire, pero la arquitectura actual prioriza simplicidad.
 
 ---
 
-## 4. Tool: `obtener_datos_fiscales`
+## 4. Tools del Oracle MCP Server
 
-### 4.1. Parámetros de entrada
+El Oracle MCP Server expone tools PL/SQL genéricas. El microservicio FiscalIA utiliza principalmente `EXECUTE_SQL`.
+
+### 4.1. `EXECUTE_SQL`
+
+**Parámetros de entrada:**
 
 | Parámetro | Tipo | Obligatorio | Descripción |
 |---|---|---|---|
-| `nit` | `string` | Sí | NIT del contribuyente (ej: `"9012345678"`) |
-| `periodo` | `string` | Sí | Año fiscal (ej: `"2024"`) |
+| `query` | `string` | Sí | SQL query con bind variables (`:nombre`) |
+| `bind_params` | `object` | No | Mapa nombre → valor para bind variables |
+| `offset` | `integer` | No | Offset para paginación (default: 0) |
+| `limit` | `integer` | No | Límite de filas (default: 100, max: 500) |
 
-### 4.2. Output completo
+**Output:** Lista de objetos con los nombres de columna como keys.
+
+### 4.2. `LIST_SCHEMAS`
+
+Lista los esquemas disponibles en la base de datos.
+
+**Parámetros:**
+
+| Parámetro | Tipo | Obligatorio | Descripción |
+|---|---|---|---|
+| `offset` | `integer` | No | Offset para paginación |
+| `limit` | `integer` | No | Límite de resultados |
+
+### 4.3. `LIST_OBJECTS`
+
+Lista los objetos (tablas, vistas) de un esquema.
+
+**Parámetros:**
+
+| Parámetro | Tipo | Obligatorio | Descripción |
+|---|---|---|---|
+| `schema_name` | `string` | Sí | Nombre del esquema |
+| `offset` | `integer` | No | Offset para paginación |
+| `limit` | `integer` | No | Límite de resultados |
+
+---
+
+## 5. Queries Utilizadas
+
+### 5.1. Paginación de contribuyentes
+
+```sql
+SELECT c.nit, c.razon_social, c.ciiu, c.regimen
+FROM contribuyentes c
+WHERE c.tipo_regimen = :tipo_regimen
+  AND c.ciiu IN (:act1, :act2, ...)
+  AND c.vigencia >= TO_DATE(:vigencia_ini, 'YYYY-MM-DD')
+  AND c.vigencia <= TO_DATE(:vigencia_fin, 'YYYY-MM-DD')
+ORDER BY c.nit
+OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
+```
+
+**Bind params:** `tipo_regimen`, `vigencia_ini`, `vigencia_fin`, `a0`, `a1`, ..., `offset`, `limit`
+
+### 5.2. Obtener contribuyente
+
+```sql
+SELECT c.nit, c.razon_social, c.ciiu, c.regimen, r.rues_estado
+FROM contribuyentes c
+LEFT JOIN rues r ON c.nit = r.nit
+WHERE c.nit = :nit
+```
+
+**Bind params:** `nit`
+
+### 5.3. Obtener declaraciones ICA
+
+```sql
+SELECT periodo, base_gravable, tarifa, impuesto
+FROM declaraciones_ica
+WHERE nit = :nit AND periodo = :periodo
+ORDER BY periodo
+```
+
+**Bind params:** `nit`, `periodo`
+
+### 5.4. Obtener exógena DIAN
+
+```sql
+SELECT periodo, ingresos
+FROM exogena_dian
+WHERE nit = :nit AND periodo = :periodo
+ORDER BY periodo
+```
+
+**Bind params:** `nit`, `periodo`
+
+---
+
+## 6. Estructura de datos esperada
+
+### 6.1. Output combinado (tras múltiples queries)
 
 ```json
 {
@@ -147,12 +198,6 @@ El MCP Server aplica las siguientes reglas para determinar `es_candidato` y `sco
       "base_gravable": 50000000,
       "tarifa": 0.01,
       "impuesto": 500000
-    },
-    {
-      "periodo": "2024-B2",
-      "base_gravable": 60000000,
-      "tarifa": 0.01,
-      "impuesto": 600000
     }
   ],
   "exogena_dian": [
@@ -161,140 +206,165 @@ El MCP Server aplica las siguientes reglas para determinar `es_candidato` y `sco
       "ingresos": 120000000
     }
   ],
-  "rues_estado": "ACTIVO",
-  "rues_fecha_constitucion": "2015-03-15",
-  "historial_anomalias": [
-    {
-      "periodo": "2024-B1",
-      "base_anterior": 120000000,
-      "base_actual": 50000000,
-      "variacion_pct": -58.33,
-      "alerta": true
-    }
-  ],
-  "grupo_homogeneo": {
-    "ciiu": "4711",
-    "media_ingresos": 85000000,
-    "mediana_ingresos": 72000000,
-    "desviacion_ingresos": 35000000,
-    "percentil_contribuyente": 65
+  "rues_estado": "ACTIVO"
+}
+```
+
+### 6.2. Errores del MCP Server
+
+| Condición | Código HTTP | Respuesta |
+|---|---|---|
+| Token inválido/expirado | 401 | `{"code": -32001, "message": "Unauthorized"}` |
+| Query inválida | 400 | `{"code": -32602, "message": "Invalid params", "data": {"error": "ORA-00942: table or view does not exist"}}` |
+| Timeout | 504 | `{"code": -32000, "message": "Request timeout"}` |
+
+El microservicio maneja `401` obteniendo un nuevo token y reintentando automáticamente.
+
+---
+
+## 7. Protocolo de comunicación
+
+### 7.1. Inicialización
+
+```
+POST {MCP_SERVER_URL}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+→ Request:
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {},
+    "clientInfo": {"name": "fiscalia-ia", "version": "2.0.0"}
+  }
+}
+
+← Response:
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {
+      "tools": {}
+    },
+    "serverInfo": {"name": "oracle-mcp-server", "version": "1.0"}
   }
 }
 ```
 
-### 4.3. Campos del output
+### 7.2. Descubrimiento de tools
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `nit` | `string` | NIT del contribuyente |
-| `razon_social` | `string` | Razón social |
-| `ciiu` | `string` | Código CIIU principal |
-| `regimen` | `string` | `COMUN` o `SIMPLIFICADO` |
-| `declaraciones_ica` | `array` | Lista de declaraciones ICA del período (bimestres/meses) |
-| `declaraciones_ica[].periodo` | `string` | Período de la declaración (ej: `"2024-B1"`) |
-| `declaraciones_ica[].base_gravable` | `number` | Base gravable declarada en COP |
-| `declaraciones_ica[].tarifa` | `number` | Tarifa aplicada (decimal, ej: `0.01` = 1%) |
-| `declaraciones_ica[].impuesto` | `number` | Impuesto calculado en COP |
-| `exogena_dian` | `array` | Ingresos reportados en exógena DIAN |
-| `exogena_dian[].periodo` | `string` | Período (anual) |
-| `exogena_dian[].ingresos` | `number` | Ingresos reportados en COP |
-| `rues_estado` | `string` | Estado en RUES: `ACTIVO`, `SUSPENDIDO`, `CANCELADO` |
-| `rues_fecha_constitucion` | `string` | Fecha de constitución (YYYY-MM-DD) |
-| `historial_anomalias` | `array` | Alertas de variación > 30% vs período anterior |
-| `historial_anomalias[].variacion_pct` | `number` | Variación porcentual |
-| `historial_anomalias[].alerta` | `boolean` | `true` si `|variacion_pct| > 30` |
-| `grupo_homogeneo` | `object` | Estadísticos del grupo de pares (mismo CIIU + ubicación + rango ingresos) |
-| `grupo_homogeneo.percentil_contribuyente` | `number` | Percentil del contribuyente dentro de su grupo (0–100) |
+```
+→ Request:
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list"
+}
 
-### 4.4. Errores esperados
+← Response:
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "tools": [
+      {"name": "EXECUTE_SQL", "description": "Execute SQL query", "inputSchema": {...}},
+      {"name": "LIST_SCHEMAS", "description": "List available schemas", "inputSchema": {...}},
+      {"name": "LIST_OBJECTS", "description": "List objects in a schema", "inputSchema": {...}}
+    ]
+  }
+}
+```
 
-| Condición | Respuesta MCP |
-|---|---|
-| NIT no encontrado en Oracle | `{"error": "NIT_NOT_FOUND", "mensaje": "El NIT 9012345678 no existe en el padrón"}` |
-| Período sin datos fiscales | `{"error": "NO_DATA_FOR_PERIOD", "mensaje": "No hay datos fiscales para el período 2024"}` |
-| Error interno de base de datos | `{"error": "ORACLE_QUERY_FAIL", "mensaje": "Error al consultar datos del contribuyente"}` |
+### 7.3. Ejecución de tool
+
+```
+→ Request:
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "EXECUTE_SQL",
+    "arguments": {
+      "query": "SELECT ... WHERE nit = :nit",
+      "bind_params": {"nit": "9012345678"},
+      "offset": 0,
+      "limit": 10
+    }
+  }
+}
+
+← Response:
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"nit\": \"9012345678\", \"razon_social\": \"COMERCIO XYZ S.A.S.\", ...}]"
+      }
+    ]
+  }
+}
+```
+
+> [!note] Manejo de respuestas
+> El contenido de `result.content[0].text` es un JSON string que el microservicio parsea automáticamente antes de retornarlo al caller.
 
 ---
 
-## 5. Responsabilidades de cada fuente de datos
+## 8. Endpoints
 
-| Capa | Responsabilidad | Datos que entrega |
+### 8.1. Variables de entorno
+
+| Variable | Descripción | Ejemplo |
 |---|---|---|
-| **MCP Server** (Oracle) | Obtener datos crudos desde Oracle Database: padrón ICA, declaraciones, exógena DIAN, RUES, catálogos | NITs candidatos con score, datos fiscales completos por NIT |
-| **Microservicio** (Python) | Orquestar el pipeline: llamar MCP, clasificar NITs (omisos/exactos/inexactos), enviar al LLM, persistir en PostgreSQL | NITs clasificados, hallazgos IA, SRF con explicación |
-| **LLM Service** | Análisis semántico: explicación de brecha fiscal, hallazgos de inexactitud, recomendaciones | JSON estructurado con hallazgos, explicación y score |
+| `MCP_SERVER_URL` | Endpoint MCP del ADB | `https://dataaccess.adb.us-ashburn-1.oraclecloudapps.com/adb/mcp/v1/databases/ocid1...` |
+| `MCP_TOKEN_URL` | Endpoint de autenticación OAuth | `https://dataaccess.adb.us-ashburn-1.oraclecloudapps.com/adb/auth/v1/databases/ocid1.../token` |
+| `MCP_DB_USER` | Usuario de base de datos | `FISCALIA_APP` |
+| `MCP_DB_PASSWORD` | Contraseña del usuario | — |
+| `MCP_TIMEOUT` | Timeout por request (seg) | `30` |
 
-**Regla fundamental:** El MCP Server NO realiza análisis semántico ni genera explicaciones en lenguaje natural. Su función es entregar datos fiscales estructurados y aplicar reglas de negocio determinísticas (cálculo de score, detección de anomalías por umbral). El análisis profundo y la redacción de hallazgos es responsabilidad exclusiva del LLM Service vía el microservicio.
+### 8.2. Configuración en infraestructura
+
+- El endpoint MCP se construye con el OCID de la Autonomous Database: `https://dataaccess.adb.{region}.oraclecloudapps.com/adb/mcp/v1/databases/{database-ocid}`
+- El endpoint de token sigue el mismo patrón: `https://dataaccess.adb.{region}.oraclecloudapps.com/adb/auth/v1/databases/{database-ocid}/token`
+- Ambos endpoints deben ser accesibles desde la red privada OCI del Container Instance
 
 ---
 
-## 6. Escenarios de error
+## 9. Escenarios de error
 
 | Escenario | Código | Capa | Comportamiento del microservicio |
 |---|---|---|---|
 | Timeout al conectar con MCP Server | `MCP_TIMEOUT` | MCP | Reintento inmediato (hasta 3 intentos con backoff exponencial). Si persiste, proceso → `ERROR`. |
-| Conexión rechazada (MCP no disponible) | `MCP_CONN_REFUSED` | MCP | El microservicio reinicia el subproceso MCP automáticamente (hasta 3 veces). Si falla, proceso → `ERROR`. |
-| Error en página específica del MCP | `MCP_PAGE_ERROR` | MCP | Reintentar la página fallida (3 intentos). Si persiste, se omite la página y se registra en `proceso_errores`. El proceso continúa. |
-| Datos incompletos del MCP para un NIT | `MCP_DATA_INCOMPLETE` | MCP | El NIT se marca como error en `proceso_detalle_errores`. Se continúa con el siguiente NIT. |
-| Timeout de consulta Oracle | `ORACLE_TIMEOUT` | ORACLE | El MCP Server retorna error; el microservicio lo trata como `MCP_PAGE_ERROR` y reintenta. |
-| NIT no encontrado en Oracle | `ORACLE_NIT_NOT_FOUND` | ORACLE | El MCP retorna el error correspondiente; el microservicio registra el error por NIT y continúa. |
-
-**Almacenamiento de errores:** Todos los errores se persisten en `proceso_errores` (a nivel de proceso) y `proceso_detalle_errores` (a nivel de NIT) en PostgreSQL, con la siguiente estructura:
-
-| Campo | Descripción |
-|---|---|
-| `capa` | `MCP`, `ORACLE`, `LLM`, `POSTGRES`, `VALIDACION`, `PROCESO` |
-| `codigo` | Código del error (ej: `MCP_TIMEOUT`) |
-| `mensaje` | Descripción textual del error |
-| `contexto` | JSON con detalles adicionales (página, timeout_ms, NIT, etc.) |
+| Token inválido/expirado (401) | `MCP_AUTH_FAIL` | MCP | Obtiene nuevo token automáticamente y reintenta. Si falla de nuevo, proceso → `ERROR`. |
+| Error en query SQL | `ORACLE_QUERY_FAIL` | ORACLE | Se registra el error y se reintenta la página (3 intentos). Si persiste, se omite y continúa. |
+| NIT sin datos | `NIT_NO_ENCONTRADO` | VALIDACION | Se registra error por NIT y se continúa con el siguiente. |
 
 ---
 
-## 7. Protocolo de descubrimiento
+## 10. Responsabilidades de cada fuente de datos
 
-El MCP Server implementa el protocolo de descubrimiento estándar de MCP. El microservicio descubre las tools disponibles al iniciar la conexión `stdio`:
-
-```
-Cliente MCP                              Servidor MCP
-    │                                         │
-    │──── initialize(request_id, protocol) ──►│
-    │◄─── initialized(server_capabilities) ──│
-    │                                         │
-    │──── tools/list(request_id) ────────────►│
-    │◄─── tools/list(result: tools[]) ───────│
-    │         [                               │
-    │           {                             │
-    │             name: "buscar_contribuyentes",│
-    │             description: "...",          │
-    │             inputSchema: {...}           │
-    │           },                             │
-    │           {                             │
-    │             name: "obtener_datos_fiscales",│
-    │             description: "...",          │
-    │             inputSchema: {...}           │
-    │           }                              │
-    │         ]                                │
-    │                                         │
-    │──── tools/call(name, args) ────────────►│
-    │◄─── tools/call(result: content) ───────│
-```
-
-El descubrimiento ocurre:
-1. Al arrancar el microservicio (health check inicial).
-2. Cada vez que el MCP Server se reinicia (el microservicio rediscovery automáticamente).
-3. Bajo demanda vía el endpoint `GET /health` del microservicio, que verifica que las tools esperadas estén disponibles.
-
-**Tools esperadas:** El microservicio valida que el MCP Server exponga exactamente dos tools:
-- `buscar_contribuyentes`
-- `obtener_datos_fiscales`
-
-Si alguna falta, el microservicio registra una alerta y no permite ejecutar procesos hasta que el MCP Server esté correctamente configurado.
+| Capa | Responsabilidad | Datos que entrega |
+|---|---|---|
+| **Oracle MCP Server** | Ejecutar queries SQL y retornar resultados estructurados | Filas de contribuyentes, declaraciones ICA, exógena DIAN, RUES |
+| **Microservicio** (Python) | Orquestar queries, armar estructura anidada, clasificar NITs, enviar al LLM, persistir en PostgreSQL | NITs clasificados, hallazgos IA, SRF con explicación |
+| **LLM Service** | Análisis semántico: explicación de brecha fiscal, hallazgos, recomendaciones | JSON estructurado con hallazgos, explicación y score |
 
 ---
 
-## 8. Consideraciones finales
+## 11. Consideraciones finales
 
 1. **El MCP Server es stateless** — no mantiene estado entre llamadas. Toda la paginación y contexto lo gestiona el microservicio.
-2. **Compatibilidad hacia atrás:** El MCP Server reemplaza completamente los packages PL/SQL `FISCAL_CROSS`, `FISCAL_INC` y `FISCAL_SCORE`. No hay convivencia entre ambos contratos.
-3. **Versionado:** El contrato MCP se versiona mediante el campo `protocolVersion` en el mensaje `initialize`. El microservicio requiere `protocolVersion >= "2025-03-26"`.
-4. **Trazabilidad:** Cada llamada a tool se loguea con `proceso_id`, `intento_id`, `duración_ms` y `NIT` (cuando aplica) para auditoría.
+2. **Sin conexión directa a Oracle** — el microservicio nunca usa `oracledb` ni `cx_Oracle`. Todos los datos fiscales se obtienen vía MCP.
+3. **Tokens frescos** — por simplicidad, se obtiene un token nuevo en cada `call_tool`. Para producción, se recomienda cachear el token con refresh automático (TTL 1h).
+4. **Versionado:** El contrato MCP se versiona mediante el campo `protocolVersion` en el mensaje `initialize`. El microservicio requiere `protocolVersion >= "2025-03-26"`.
+5. **Trazabilidad:** Cada llamada a tool se loguea con `proceso_id`, `intento_id`, `duración_ms` y `NIT` (cuando aplica) para auditoría.

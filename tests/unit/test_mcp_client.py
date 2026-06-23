@@ -1,5 +1,5 @@
-import pytest
 from infrastructure.mcp.classify import clasificar_nit
+
 from tests.factories import hacer_datos_mcp
 
 

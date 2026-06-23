@@ -36,6 +36,9 @@ Thumbs.db
 # Windows artifact
 nul
 
+# Obsidian workspace (local, not shared)
+MEMORY/.obsidian/
+
 # Logs
 *.log
 
