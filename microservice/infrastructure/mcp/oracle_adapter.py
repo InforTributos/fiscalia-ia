@@ -1,47 +1,63 @@
-import json
 import logging
 from typing import Any
 
-import httpx
+import oracledb
 from config import settings
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
 
 logger = logging.getLogger(__name__)
 
+_pool: oracledb.AsyncConnectionPool | None = None
 
-class MCPClient:
+
+class OracleClient:
     def __init__(self):
-        self._url = settings.mcp_server_url
-        self._token_url = settings.mcp_token_url
-        self._user = settings.mcp_db_user
-        self._password = settings.mcp_db_password
-        self._timeout = settings.mcp_timeout
+        self._pool = None
 
-    async def _get_token(self) -> str:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                self._token_url,
-                data={"grant_type": "password", "username": self._user, "password": self._password},
-                timeout=self._timeout,
+    async def initialize(self):
+        global _pool
+        if _pool is None:
+            dsn = oracledb.makedsn(settings.oracle_host, settings.oracle_port, service_name=settings.oracle_service)
+            _pool = await oracledb.create_pool_async(
+                user=settings.oracle_user,
+                password=settings.oracle_password,
+                dsn=dsn,
+                min=settings.oracle_pool_min,
+                max=settings.oracle_pool_max,
+                timeout=settings.oracle_pool_timeout,
             )
-            resp.raise_for_status()
-            return resp.json()["access_token"]
+            logger.info("Oracle pool creado: min=%d max=%d", settings.oracle_pool_min, settings.oracle_pool_max)
+        self._pool = _pool
 
-    async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> Any:
-        token = await self._get_token()
-        headers = {"Authorization": f"Bearer {token}"}
-        timeout = httpx.Timeout(self._timeout, read=self._timeout)
+    async def execute_sql(self, query: str, bind_params: dict[str, Any] | None = None) -> list[dict]:
+        if self._pool is None:
+            await self.initialize()
+        async with self._pool.acquire() as conn:
+            cursor = conn.cursor()
+            try:
+                result = await cursor.execute(query, bind_params or {})
+                rows = await result.fetchall()
+                columns = [c[0].lower() for c in result.description] if result.description else []
+                return [dict(zip(columns, row)) for row in rows]
+            finally:
+                await cursor.close()
 
-        async with httpx.AsyncClient(headers=headers, timeout=timeout) as client:
-            async with streamable_http_client(self._url, http_client=client) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    result = await session.call_tool(name, arguments=arguments or {})
-                    if not result.content:
-                        return {}
-                    text = result.content[0].text
-                    return json.loads(text) if isinstance(text, str) else text
+    async def execute_sql_raw(self, query: str, bind_params: dict[str, Any] | None = None) -> Any:
+        if self._pool is None:
+            await self.initialize()
+        async with self._pool.acquire() as conn:
+            cursor = conn.cursor()
+            try:
+                result = await cursor.execute(query, bind_params or {})
+                rows = await result.fetchall()
+                if not rows:
+                    return None
+                return rows
+            finally:
+                await cursor.close()
 
     async def close(self):
-        pass
+        global _pool
+        if _pool:
+            await _pool.close()
+            _pool = None
+            logger.info("Oracle pool cerrado")

@@ -9,7 +9,7 @@ from domain.services.crosscheck_service import (
 from domain.services.inconsistency_service import nivel_riesgo
 from infrastructure.llm.llm_service import LLMService
 from infrastructure.llm.prompts import construir_prompt
-from infrastructure.mcp.oracle_adapter import MCPClient
+from infrastructure.mcp.oracle_adapter import OracleClient
 from infrastructure.mcp.pagination import obtener_datos_fiscales
 from infrastructure.persistence.repositorio_proceso import PostgresProcesoRepo
 
@@ -25,8 +25,8 @@ class ProcesoOrchestrator:
         logger.info("Orquestador: analizando NIT %s (detalle %d, periodo %s)", nit, detalle_id, periodo)
 
         try:
-            mcp = MCPClient()
-            datos = await obtener_datos_fiscales(mcp, nit, periodo)
+            client = OracleClient()
+            datos = await obtener_datos_fiscales(client, nit, periodo)
             if not datos:
                 logger.warning("NIT %s sin datos fiscales disponibles", nit)
                 return

@@ -46,11 +46,14 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    mcp_server_url: str = ""
-    mcp_token_url: str = ""
-    mcp_db_user: str = ""
-    mcp_db_password: str = ""
-    mcp_timeout: int = 30
+    oracle_host: str = "localhost"
+    oracle_port: int = 1521
+    oracle_service: str = ""
+    oracle_user: str = ""
+    oracle_password: str = ""
+    oracle_pool_min: int = 2
+    oracle_pool_max: int = 5
+    oracle_pool_timeout: int = 30
 
     startup_time: float = time.time()
 
@@ -70,11 +73,11 @@ class Settings(BaseSettings):
             raise ValueError("POSTGRES_PASSWORD tiene valor placeholder 'changeme'")
         return v
 
-    @field_validator("mcp_db_user", "mcp_db_password")
+    @field_validator("oracle_user", "oracle_password")
     @classmethod
-    def _validar_mcp_creds(cls, v: str) -> str:
+    def _validar_oracle_creds(cls, v: str) -> str:
         if v and v.lower().startswith("changeme"):
-            raise ValueError("MCP credential tiene valor placeholder 'changeme'")
+            raise ValueError("Oracle credential tiene valor placeholder 'changeme'")
         return v
 
 

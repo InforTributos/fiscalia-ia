@@ -9,7 +9,7 @@ from domain.services.inconsistency_service import nivel_riesgo
 from fastapi import APIRouter
 from infrastructure.llm.llm_service import LLMService
 from infrastructure.llm.prompts import construir_prompt
-from infrastructure.mcp.oracle_adapter import MCPClient
+from infrastructure.mcp.oracle_adapter import OracleClient
 from infrastructure.mcp.pagination import obtener_datos_fiscales
 from schemas.contribuyente import (
     AnalyzeResponse,
@@ -36,8 +36,8 @@ async def analizar_contribuyente(
         cached["cache_hit"] = True
         return AnalyzeResponse(**cached)
 
-    mcp = MCPClient()
-    datos = await obtener_datos_fiscales(mcp, nit, periodo)
+    client = OracleClient()
+    datos = await obtener_datos_fiscales(client, nit, periodo)
     if not datos:
         raise NITNoEncontradoError(nit)
 

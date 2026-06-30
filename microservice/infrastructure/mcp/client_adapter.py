@@ -1,7 +1,7 @@
 import logging
 from collections.abc import AsyncGenerator
 
-from infrastructure.mcp.oracle_adapter import MCPClient
+from infrastructure.mcp.oracle_adapter import OracleClient
 from infrastructure.mcp.pagination import obtener_datos_fiscales, paginar_contribuyentes
 
 logger = logging.getLogger(__name__)
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class AGT05MCPClient:
     def __init__(self):
-        self.client = MCPClient()
+        self.client = OracleClient()
 
     async def buscar_contribuyentes(
         self,

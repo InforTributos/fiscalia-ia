@@ -7,7 +7,7 @@ client = TestClient(app)
 
 
 @patch("routers.analisis.LLMService")
-@patch("routers.analisis.MCPClient")
+@patch("routers.analisis.OracleClient")
 @patch("routers.analisis.obtener_datos_fiscales")
 def test_analisis_retorna_200(mock_pagination, mock_mcp_cls, mock_llm_cls):
     mock_mcp = AsyncMock()
@@ -38,7 +38,7 @@ def test_analisis_retorna_200(mock_pagination, mock_mcp_cls, mock_llm_cls):
     assert data["srf_total"] > 0
 
 
-@patch("routers.analisis.MCPClient")
+@patch("routers.analisis.OracleClient")
 @patch("routers.analisis.obtener_datos_fiscales")
 def test_analisis_404(mock_pagination, mock_mcp_cls):
     mock_mcp = AsyncMock()

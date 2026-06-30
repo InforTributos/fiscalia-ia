@@ -15,11 +15,9 @@ from infrastructure.mcp.pagination import (
 @pytest.mark.asyncio
 async def test_obtener_datos_fiscales_retorna_dict_completo():
     client = AsyncMock()
-    client.call_tool.side_effect = [
-        [
-            {"nit": "9003189639", "razon_social": "TEST S.A.S.",
-             "ciiu": "4711", "regimen": "COMUN", "rues_estado": "ACTIVO"},
-        ],
+    client.execute_sql.side_effect = [
+        [{"nit": "9003189639", "razon_social": "TEST S.A.S.",
+          "ciiu": "4711", "regimen": "COMUN", "rues_estado": "ACTIVO"}],
         [{"periodo": "2024-B1", "base_gravable": 50000000, "tarifa": 0.008, "impuesto": 400000}],
         [{"periodo": "2024", "ingresos": 120000000}],
     ]
@@ -36,13 +34,13 @@ async def test_obtener_datos_fiscales_retorna_dict_completo():
     assert result["declaraciones_ica"][0]["base_gravable"] == 50000000
     assert len(result["exogena_dian"]) == 1
     assert result["exogena_dian"][0]["ingresos"] == 120000000
-    assert client.call_tool.call_count == 3
+    assert client.execute_sql.call_count == 3
 
 
 @pytest.mark.asyncio
 async def test_obtener_datos_fiscales_sin_contribuyente_retorna_none():
     client = AsyncMock()
-    client.call_tool.return_value = None
+    client.execute_sql.return_value = None
 
     result = await obtener_datos_fiscales(client, "9999999999", "2024")
     assert result is None
@@ -51,14 +49,14 @@ async def test_obtener_datos_fiscales_sin_contribuyente_retorna_none():
 @pytest.mark.asyncio
 async def test_obtener_datos_fiscales_contribuyente_dict_sin_lista():
     client = AsyncMock()
-    client.call_tool.side_effect = [
-        {"nit": "123", "razon_social": "SINGLE S.A.", "ciiu": "4711", "regimen": "COMUN", "rues_estado": "ACTIVO"},
+    client.execute_sql.side_effect = [
+        {"nit": "123", "razon_social": "SINGLE S.A.", "ciiu": "4711",
+         "regimen": "COMUN", "rues_estado": "ACTIVO"},
         [],
         [],
     ]
 
     result = await obtener_datos_fiscales(client, "123", "2024")
-
     assert result is not None
     assert result["nit"] == "123"
     assert result["razon_social"] == "SINGLE S.A."
@@ -67,26 +65,22 @@ async def test_obtener_datos_fiscales_contribuyente_dict_sin_lista():
 @pytest.mark.asyncio
 async def test_obtener_datos_fiscales_sin_declaraciones():
     client = AsyncMock()
-    client.call_tool.side_effect = [
-        [{"nit": "123", "razon_social": "TEST", "ciiu": "4711", "regimen": "COMUN", "rues_estado": "ACTIVO"}],
+    client.execute_sql.side_effect = [
+        [{"nit": "123", "razon_social": "TEST", "ciiu": "4711",
+          "regimen": "COMUN", "rues_estado": "ACTIVO"}],
         None,
         None,
     ]
 
     result = await obtener_datos_fiscales(client, "123", "2024")
-
     assert result["declaraciones_ica"] == []
     assert result["exogena_dian"] == []
-
-
-def _get_call_kwargs(mock_call):
-    return mock_call.kwargs
 
 
 @pytest.mark.asyncio
 async def test_paginar_contribuyentes_sql_placeholders():
     client = AsyncMock()
-    client.call_tool.return_value = []
+    client.execute_sql.return_value = []
 
     items = []
     async for item in paginar_contribuyentes(
@@ -100,22 +94,22 @@ async def test_paginar_contribuyentes_sql_placeholders():
         items.append(item)
 
     assert len(items) == 0
-    call_args = client.call_tool.call_args_list[0]
-    actual_dict = call_args.args[1]
-    assert actual_dict["query"] == PAGINAR_CONTRIBUYENTES_SQL.format(
-        actividades_placeholders=":a0, :a1")
-    assert actual_dict["bind_params"]["a0"] == "4711"
-    assert actual_dict["bind_params"]["a1"] == "4721"
-    assert actual_dict["bind_params"]["tipo_regimen"] == "COMUN"
-    assert actual_dict["bind_params"]["offset"] == 0
-    assert actual_dict["bind_params"]["limit"] == 100
+    call_args = client.execute_sql.call_args_list[0]
+    sql = call_args.args[0]
+    bind = call_args.args[1]
+    assert sql == PAGINAR_CONTRIBUYENTES_SQL.format(actividades_placeholders=":a0, :a1")
+    assert bind["a0"] == "4711"
+    assert bind["a1"] == "4721"
+    assert bind["tipo_regimen"] == "COMUN"
+    assert bind["offset"] == 0
+    assert bind["limit"] == 100
 
 
 @pytest.mark.asyncio
 async def test_paginar_contribuyentes_paginacion_completa():
     client = AsyncMock()
     page_size = 3
-    client.call_tool.side_effect = [
+    client.execute_sql.side_effect = [
         [{"nit": "1"}, {"nit": "2"}, {"nit": "3"}],
         [{"nit": "4"}, {"nit": "5"}, {"nit": "6"}],
         [{"nit": "7"}, {"nit": "8"}],
@@ -136,18 +130,18 @@ async def test_paginar_contribuyentes_paginacion_completa():
     assert len(items) == 8
     assert items[0]["nit"] == "1"
     assert items[7]["nit"] == "8"
-    assert client.call_tool.call_count == 3
+    assert client.execute_sql.call_count == 3
 
-    offsets = [c.args[1]["bind_params"]["offset"] for c in client.call_tool.call_args_list]
+    offsets = [c.args[1]["offset"] for c in client.execute_sql.call_args_list]
     assert offsets == [0, 3, 6]
-    limits = [c.args[1]["bind_params"]["limit"] for c in client.call_tool.call_args_list]
+    limits = [c.args[1]["limit"] for c in client.execute_sql.call_args_list]
     assert limits == [3, 3, 3]
 
 
 @pytest.mark.asyncio
 async def test_paginar_contribuyentes_resultado_vacio_termina():
     client = AsyncMock()
-    client.call_tool.return_value = []
+    client.execute_sql.return_value = []
 
     items = []
     async for item in paginar_contribuyentes(
@@ -161,13 +155,13 @@ async def test_paginar_contribuyentes_resultado_vacio_termina():
         items.append(item)
 
     assert len(items) == 0
-    assert client.call_tool.call_count == 1
+    assert client.execute_sql.call_count == 1
 
 
 @pytest.mark.asyncio
 async def test_omisos_conocidos_usa_tablas_reales():
     client = AsyncMock()
-    client.call_tool.return_value = [
+    client.execute_sql.return_value = [
         {"idntfccion": "9003189639", "nmbre_rzon_scial": "TEST S.A.",
          "id_actvdad_ecnmca": "4711", "drccion": "Calle 10", "id_sjto_impsto": 123},
     ]
@@ -180,7 +174,7 @@ async def test_omisos_conocidos_usa_tablas_reales():
 @pytest.mark.asyncio
 async def test_omisos_desconocidos_dian_sin_registro():
     client = AsyncMock()
-    client.call_tool.return_value = [
+    client.execute_sql.return_value = [
         {"nit": "9012345678", "razon_social": "NO REGISTRADA S.A.",
          "ciiu": "4721", "valor_dian": 50000000, "vgncia": "2024"},
     ]
@@ -193,7 +187,7 @@ async def test_omisos_desconocidos_dian_sin_registro():
 @pytest.mark.asyncio
 async def test_inexactos_ciiu_tarifa_dian_mayor():
     client = AsyncMock()
-    client.call_tool.return_value = [
+    client.execute_sql.return_value = [
         {"idntfccion": "9003189639", "nmbre_rzon_scial": "TEST",
          "ciiu_declarado": "4711", "tarifa_declarada": 0.008,
          "ciiu_dian": "4721", "tarifa_dian": 0.010},
@@ -207,7 +201,7 @@ async def test_inexactos_ciiu_tarifa_dian_mayor():
 @pytest.mark.asyncio
 async def test_inexactos_retenciones_diferencia_mayor_umbral():
     client = AsyncMock()
-    client.call_tool.return_value = [
+    client.execute_sql.return_value = [
         {"idntfccion": "9003189639", "nmbre_rzon_scial": "TEST",
          "retenciones_declaradas_practicadas": 500000,
          "retenciones_exogena_practicadas": 750000,

@@ -42,15 +42,15 @@ APEX (Oracle) → REST → Microservicio Python (OCI Container Instance)
 | Frontend | Oracle APEX 24.x |
 | Microservicio | FastAPI (Python 3.14+) en OCI Container Instance |
 | DB microservicio | PostgreSQL 16+ (asyncpg) — 6 tablas |
-| DB fiscal | Oracle Database 23ai/19c (vía Oracle MCP Server) |
+| DB fiscal | Oracle Database (via python-oracledb) |
 | LLM Tier 1 | Anthropic Claude / OpenAI GPT (pago) |
 | LLM Tier 2 | NVIDIA NIM — Qwen2.5-7B (gratis) |
 | LLM Tier 3 | HuggingFace — Qwen2.5-7B (gratis) |
-| Comunicación | MCP Streamable HTTP, red privada OCI (Bearer token) |
+| Comunicacion | python-oracledb directo (pool async), sin MCP |
 | Mapas | Google Maps JS API embebida en APEX |
 
-> [!warning] MCP no es Oracle directo
-> El microservicio **nunca** conecta directo a Oracle. Todos los datos fiscales se obtienen vía Oracle MCP Server (HTTP Streamable). No usar `oracledb` ni `cx_Oracle`.
+> [!warning] Oracle: python-oracledb directo
+> El microservicio usa `oracledb` con pool asincrono para conectar directo a Oracle. Las credenciales van en variables de entorno.
 
 ## Variables de Entorno
 
@@ -136,7 +136,7 @@ Definidas en `config.py:Settings` (pydantic-settings). El `.env.example` está e
 | FastAPI | Framework REST |
 | asyncpg | Conexión PostgreSQL |
 | anthropic, openai, huggingface_hub | LLM providers |
-| mcp (SDK v1.28+) | Cliente MCP HTTP (Streamable) |
+| oracledb | Conexion Oracle async (pool) |
 | pydantic + pydantic-settings | Schemas y config |
 | tenacity | Retry con backoff |
 | ruff | Linter y formateador |

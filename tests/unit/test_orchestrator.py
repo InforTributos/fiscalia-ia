@@ -27,7 +27,7 @@ def mock_llm():
 
 @pytest.fixture
 def mock_mcp_omiso():
-    with patch("application.use_cases.orquestar_proceso.MCPClient") as _, \
+    with patch("application.use_cases.orquestar_proceso.OracleClient") as _, \
          patch("application.use_cases.orquestar_proceso.obtener_datos_fiscales") as odf:
         odf.return_value = {
             "nit": "9003189639",
@@ -47,7 +47,7 @@ async def test_ejecutar_omiso(mock_mcp_omiso, mock_llm, mock_repo):
 
 
 async def test_ejecutar_inexacto(mock_llm, mock_repo):
-    with patch("application.use_cases.orquestar_proceso.MCPClient") as _, \
+    with patch("application.use_cases.orquestar_proceso.OracleClient") as _, \
          patch("application.use_cases.orquestar_proceso.obtener_datos_fiscales") as odf:
         odf.return_value = {
             "nit": "9003189639",
@@ -63,7 +63,7 @@ async def test_ejecutar_inexacto(mock_llm, mock_repo):
 
 
 async def test_ejecutar_error_mcp(mock_llm, mock_repo):
-    with patch("application.use_cases.orquestar_proceso.MCPClient") as _, \
+    with patch("application.use_cases.orquestar_proceso.OracleClient") as _, \
          patch("application.use_cases.orquestar_proceso.obtener_datos_fiscales") as odf:
         odf.side_effect = Exception("MCP connection error")
         orch = ProcesoOrchestrator(mock_llm, mock_repo)

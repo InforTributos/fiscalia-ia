@@ -1,6 +1,6 @@
 import logging
 
-from infrastructure.mcp.oracle_adapter import MCPClient
+from infrastructure.mcp.oracle_adapter import OracleClient
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ ORDER BY periodo
 
 
 async def paginar_contribuyentes(
-    client: MCPClient,
+    client: OracleClient,
     vigencia_ini: str,
     vigencia_fin: str,
     tipo_regimen: str,
@@ -62,12 +62,9 @@ async def paginar_contribuyentes(
     total_obtenidos = 0
 
     while True:
-        logger.info("MCP: solicitando offset=%d limit=%d", offset, page_size)
+        logger.info("Oracle: solicitando offset=%d limit=%d", offset, page_size)
         params = {**bind_params, "offset": offset, "limit": page_size}
-        result = await client.call_tool("EXECUTE_SQL", {
-            "query": sql,
-            "bind_params": params,
-        })
+        result = await client.execute_sql(sql, params)
 
         if not result:
             break
@@ -85,30 +82,21 @@ async def paginar_contribuyentes(
 
         offset += page_size
 
-    logger.info("MCP: paginación completada — %d contribuyentes obtenidos", total_obtenidos)
+    logger.info("Paginacion completada — %d contribuyentes obtenidos", total_obtenidos)
 
 
-async def obtener_datos_fiscales(client: MCPClient, nit: str, periodo: str) -> dict | None:
-    logger.info("MCP: solicitando datos fiscales para NIT %s periodo %s", nit, periodo)
+async def obtener_datos_fiscales(client: OracleClient, nit: str, periodo: str) -> dict | None:
+    logger.info("Oracle: solicitando datos fiscales para NIT %s periodo %s", nit, periodo)
 
-    contribuyente = await client.call_tool("EXECUTE_SQL", {
-        "query": OBTENER_CONTRIBUYENTE_SQL,
-        "bind_params": {"nit": nit},
-    })
+    contribuyente = await client.execute_sql(OBTENER_CONTRIBUYENTE_SQL, {"nit": nit})
 
     if not contribuyente:
         return None
 
     row = contribuyente[0] if isinstance(contribuyente, list) else contribuyente
 
-    declaraciones = await client.call_tool("EXECUTE_SQL", {
-        "query": OBTENER_DECLARACIONES_SQL,
-        "bind_params": {"nit": nit, "periodo": periodo},
-    })
-    exogena = await client.call_tool("EXECUTE_SQL", {
-        "query": OBTENER_EXOGENA_SQL,
-        "bind_params": {"nit": nit, "periodo": periodo},
-    })
+    declaraciones = await client.execute_sql(OBTENER_DECLARACIONES_SQL, {"nit": nit, "periodo": periodo})
+    exogena = await client.execute_sql(OBTENER_EXOGENA_SQL, {"nit": nit, "periodo": periodo})
 
     return {
         "nit": row.get("nit", nit),
@@ -247,7 +235,7 @@ OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 """
 
 
-async def obtener_omisos_conocidos(client, vigencia, periodo, page_size=None):
+async def obtener_omisos_conocidos(client: OracleClient, vigencia, periodo, page_size=None):
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
@@ -261,10 +249,7 @@ async def obtener_omisos_conocidos(client, vigencia, periodo, page_size=None):
             "offset": offset_val,
             "limit": size,
         }
-        result = await client.call_tool("EXECUTE_SQL", {
-            "query": OMISOS_CONOCIDOS_SQL,
-            "bind_params": params,
-        })
+        result = await client.execute_sql(OMISOS_CONOCIDOS_SQL, params)
         if not result:
             break
         items = result if isinstance(result, list) else [result]
@@ -280,7 +265,7 @@ async def obtener_omisos_conocidos(client, vigencia, periodo, page_size=None):
     logger.info("Omisos conocidos: %d candidatos obtenidos", total)
 
 
-async def obtener_omisos_desconocidos(client, vigencia, page_size=None):
+async def obtener_omisos_desconocidos(client: OracleClient, vigencia, page_size=None):
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
@@ -292,10 +277,7 @@ async def obtener_omisos_desconocidos(client, vigencia, page_size=None):
             "offset": offset_val,
             "limit": size,
         }
-        result = await client.call_tool("EXECUTE_SQL", {
-            "query": OMISOS_DESCONOCIDOS_DIAN_SQL,
-            "bind_params": params,
-        })
+        result = await client.execute_sql(OMISOS_DESCONOCIDOS_DIAN_SQL, params)
         if not result:
             break
         items = result if isinstance(result, list) else [result]
@@ -311,7 +293,7 @@ async def obtener_omisos_desconocidos(client, vigencia, page_size=None):
     logger.info("Omisos desconocidos: %d candidatos obtenidos", total)
 
 
-async def obtener_inexactos_ciiu(client, periodo, page_size=None):
+async def obtener_inexactos_ciiu(client: OracleClient, periodo, page_size=None):
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
@@ -324,10 +306,7 @@ async def obtener_inexactos_ciiu(client, periodo, page_size=None):
             "offset": offset_val,
             "limit": size,
         }
-        result = await client.call_tool("EXECUTE_SQL", {
-            "query": INEXACTOS_CIIU_SQL,
-            "bind_params": params,
-        })
+        result = await client.execute_sql(INEXACTOS_CIIU_SQL, params)
         if not result:
             break
         items = result if isinstance(result, list) else [result]
@@ -343,7 +322,7 @@ async def obtener_inexactos_ciiu(client, periodo, page_size=None):
     logger.info("Inexactos CIIU: %d candidatos obtenidos", total)
 
 
-async def obtener_inexactos_retenciones(client, periodo, page_size=None, umbral_pct=None):
+async def obtener_inexactos_retenciones(client: OracleClient, periodo, page_size=None, umbral_pct=None):
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
@@ -358,10 +337,7 @@ async def obtener_inexactos_retenciones(client, periodo, page_size=None, umbral_
             "offset": offset_val,
             "limit": size,
         }
-        result = await client.call_tool("EXECUTE_SQL", {
-            "query": INEXACTOS_RETENCIONES_SQL,
-            "bind_params": params,
-        })
+        result = await client.execute_sql(INEXACTOS_RETENCIONES_SQL, params)
         if not result:
             break
         items = result if isinstance(result, list) else [result]
