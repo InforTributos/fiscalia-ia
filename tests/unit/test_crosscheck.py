@@ -93,3 +93,50 @@ def test_srf_exogena_match():
 def test_clasifica_exacto_sin_datos():
     datos = {"nit": "9003189639", "declaraciones_ica": [{"base_gravable": 1000}], "exogena_dian": []}
     assert clasificar_por_datos(datos) == "INEXACTO"
+
+
+def test_clasificar_omiso_conocido_en_datos():
+    datos = {
+        "nit": "9003189639", "tipo": "OMISO_CONOCIDO",
+        "declaraciones_ica": [], "exogena_dian": [],
+    }
+    assert clasificar_por_datos(datos) == "OMISO_CONOCIDO"
+
+
+def test_clasificar_omiso_desconocido_en_datos():
+    datos = {
+        "nit": "9012345678", "tipo": "OMISO_DESCONOCIDO",
+        "fuente": "DIAN", "declaraciones_ica": [],
+    }
+    assert clasificar_por_datos(datos) == "OMISO_DESCONOCIDO"
+
+
+def test_inexacto_ciiu_genera_inconsistencia():
+    datos = {
+        "nit": "9003189639", "tipo": "INEXACTO_CIIU",
+        "ciiu": "4711", "ciiu_dian": "4721",
+        "ciiu_declarado": "4711",
+        "tarifa_declarada": 0.008, "tarifa_dian": 0.010,
+        "declaraciones_ica": [{"periodo": "2024-B1", "base_gravable": 50000000, "tarifa": 0.008, "impuesto": 400000}],
+        "exogena_dian": [],
+    }
+    incs = extraer_inconsistencias(datos)
+    ciiu_incs = [i for i in incs if i["tipo"] == "TARIFA_INCORRECTA_CIIU"]
+    assert len(ciiu_incs) == 1
+    assert ciiu_incs[0]["ciiu_declarado"] == "4711"
+    assert ciiu_incs[0]["ciiu_dian"] == "4721"
+
+
+def test_inexacto_retenciones_genera_inconsistencia():
+    datos = {
+        "nit": "9003189639", "tipo": "INEXACTO_RETENCIONES",
+        "diferencia_pct": 25.0,
+        "retenciones_declaradas_practicadas": 500000,
+        "retenciones_exogena_practicadas": 750000,
+        "declaraciones_ica": [{"periodo": "2024-B1", "base_gravable": 50000000, "tarifa": 0.008, "impuesto": 400000}],
+        "exogena_dian": [],
+    }
+    incs = extraer_inconsistencias(datos)
+    ret_incs = [i for i in incs if i["tipo"] == "RETENCIONES_INCONSISTENTES"]
+    assert len(ret_incs) == 1
+    assert ret_incs[0]["diferencia_pct"] == 25.0

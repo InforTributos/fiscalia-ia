@@ -20,6 +20,10 @@ TARIFAS_CIIU = {
 
 
 def clasificar_por_datos(datos: dict) -> str:
+    tipo = datos.get("tipo", "")
+    if tipo in ("OMISO_CONOCIDO", "OMISO_DESCONOCIDO", "INEXACTO_CIIU", "INEXACTO_RETENCIONES"):
+        return tipo
+
     declaraciones = datos.get("declaraciones_ica", [])
     if not declaraciones:
         return "OMISO"
@@ -28,6 +32,37 @@ def clasificar_por_datos(datos: dict) -> str:
 
 def extraer_inconsistencias(datos: dict) -> list[dict]:
     inconsistencias = []
+    tipo = datos.get("tipo", "")
+
+    if tipo == "INEXACTO_CIIU":
+        ciiu_dec = datos.get("ciiu_declarado", datos.get("ciiu", ""))
+        ciiu_dian = datos.get("ciiu_dian", "")
+        tarifa_dec = datos.get("tarifa_declarada", 0)
+        tarifa_dian = datos.get("tarifa_dian", 0)
+        if ciiu_dec and ciiu_dian and tarifa_dian > tarifa_dec:
+            inconsistencias.append({
+                "tipo": "TARIFA_INCORRECTA_CIIU",
+                "ciiu_declarado": ciiu_dec,
+                "ciiu_dian": ciiu_dian,
+                "tarifa_declarada": tarifa_dec,
+                "tarifa_dian": tarifa_dian,
+                "severidad": "ALTA",
+            })
+
+    if tipo == "INEXACTO_RETENCIONES":
+        diff = datos.get("diferencia_pct", 0)
+        if diff > 0:
+            inconsistencias.append({
+                "tipo": "RETENCIONES_INCONSISTENTES",
+                "diferencia_pct": diff,
+                "retenciones_declaradas": datos.get("retenciones_declaradas_practicadas", 0),
+                "retenciones_exogena": datos.get("retenciones_exogena_practicadas", 0),
+                "severidad": "MEDIA" if diff < 20 else "ALTA",
+            })
+
+    if tipo:
+        return inconsistencias
+
     exogena_list = datos.get("exogena_dian", [])
     ingresos_exogena = sum(e.get("ingresos", 0) or 0 for e in exogena_list)
 

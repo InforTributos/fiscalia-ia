@@ -21,12 +21,12 @@ class ProcesoOrchestrator:
         self.llm = llm_service or LLMService()
         self.proceso_repo = proceso_repo or PostgresProcesoRepo()
 
-    async def ejecutar(self, proceso_id: str, intento_id: int, nit: str, detalle_id: int):
-        logger.info("Orquestador: analizando NIT %s (detalle %d)", nit, detalle_id)
+    async def ejecutar(self, proceso_id: str, intento_id: int, nit: str, detalle_id: int, periodo: str = "2024"):
+        logger.info("Orquestador: analizando NIT %s (detalle %d, periodo %s)", nit, detalle_id, periodo)
 
         try:
             mcp = MCPClient()
-            datos = await obtener_datos_fiscales(mcp, nit, "2024")
+            datos = await obtener_datos_fiscales(mcp, nit, periodo)
             if not datos:
                 logger.warning("NIT %s sin datos fiscales disponibles", nit)
                 return

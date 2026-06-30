@@ -32,3 +32,26 @@ def _es_omiso(item: dict) -> bool:
     razon = (item.get("razon") or "").lower()
     keywords = ["omiso", "no declaró", "sin declaración", "no presenta", "omisión"]
     return any(kw in razon for kw in keywords)
+
+
+def clasificar_candidato(item: dict) -> tuple[str, str]:
+    tipo = item.get("tipo", "")
+
+    if tipo == "OMISO_CONOCIDO":
+        razon = item.get("razon", "Contribuyente registrado sin declaracion ICA")
+        return ("OMISO_CONOCIDO", razon)
+
+    if tipo == "OMISO_DESCONOCIDO":
+        fuente = item.get("fuente", "externa")
+        return ("OMISO_DESCONOCIDO", f"Detectado por fuente {fuente} — no registrado en el municipio")
+
+    if tipo == "INEXACTO_CIIU":
+        ciiu_dec = item.get("ciiu_declarado", "")
+        ciiu_dian = item.get("ciiu_dian", "")
+        return ("INEXACTO_CIIU", f"CIIU declarado {ciiu_dec} vs DIAN {ciiu_dian}")
+
+    if tipo == "INEXACTO_RETENCIONES":
+        diff = item.get("diferencia_pct", 0)
+        return ("INEXACTO_RETENCIONES", f"Diferencia en retenciones del {diff}%")
+
+    return ("EXACTO", "Sin inconsistencias detectadas")
