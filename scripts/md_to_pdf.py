@@ -1,7 +1,12 @@
 import sys
 import os
+import json
+import time
+import base64
+import subprocess
 import markdown
 import tempfile
+import shutil
 
 MD_PATH = sys.argv[1] if len(sys.argv) > 1 else "docs/cliente/propuesta-desarrollo-fiscalia.md"
 PDF_PATH = MD_PATH.replace(".md", ".pdf")
@@ -84,39 +89,97 @@ html_doc = f"""<!DOCTYPE html>
 </body>
 </html>"""
 
-# Write HTML to a temp file
 tmp_html = os.path.join(tempfile.gettempdir(), "propuesta-fiscalia.html")
 with open(tmp_html, "w", encoding="utf-8") as f:
     f.write(html_doc)
 
-print(f"HTML generado: {tmp_html}")
-
-# Try Edge headless print-to-pdf
+# Find Edge
 edge_paths = [
     os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
-    os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
 ]
-
-edge = None
-for p in edge_paths:
-    if os.path.exists(p):
-        edge = p
-        break
-
-if edge:
-    abs_html = os.path.abspath(tmp_html)
-    abs_pdf = os.path.abspath(PDF_PATH)
-    import subprocess
-    cmd = [edge, "--headless", "--disable-gpu", f"--print-to-pdf={abs_pdf}", f"file:///{abs_html.replace(os.sep, '/')}"]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    if os.path.exists(abs_pdf) and os.path.getsize(abs_pdf) > 0:
-        print(f"PDF generado: {PDF_PATH}")
-    else:
-        print("Error generando PDF con Edge:", result.stderr)
-        sys.exit(1)
-else:
-    print(f"HTML listo en: {tmp_html}")
-    print("Abre el archivo en tu navegador y usa Imprimir > Guardar como PDF")
+edge = next((p for p in edge_paths if os.path.exists(p)), None)
+if not edge:
+    print("Edge no encontrado")
     sys.exit(1)
+
+# Start Edge headless with debug port
+abs_html = os.path.abspath(tmp_html)
+user_dir = os.path.join(tempfile.gettempdir(), "edge-profile-" + str(os.getpid()))
+
+proc = subprocess.Popen(
+    [edge, f"--headless=new", f"--remote-debugging-port=9222",
+     f"--user-data-dir={user_dir}", "--disable-gpu", "--no-first-run",
+     "--remote-allow-origins=*",
+     f"file:///{abs_html.replace(os.sep, '/')}"],
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+)
+
+time.sleep(2)
+
+try:
+    import urllib.request
+    resp = urllib.request.urlopen("http://localhost:9222/json")
+    tabs = json.loads(resp.read())
+    ws_url = None
+    for t in tabs:
+        if t.get("url", "").startswith("file://"):
+            ws_url = t["webSocketDebuggerUrl"]
+            break
+    if not ws_url:
+        ws_url = tabs[0]["webSocketDebuggerUrl"]
+
+    import websocket
+    ws = websocket.create_connection(ws_url)
+    msg_id = 1
+
+    def send_cmd(method, params=None):
+        global msg_id
+        req = {"id": msg_id, "method": method, "params": params or {}}
+        msg_id += 1
+        ws.send(json.dumps(req))
+        while True:
+            resp = json.loads(ws.recv())
+            if resp.get("id") == req["id"]:
+                return resp.get("result")
+
+    # Wait for page to load
+    send_cmd("Page.enable")
+    time.sleep(1)
+
+    # Print to PDF with empty header/footer
+    pdf_result = send_cmd("Page.printToPDF", {
+        "printBackground": True,
+        "preferCSSPageSize": True,
+        "headerTemplate": "",
+        "footerTemplate": "",
+        "marginTop": 0.7,
+        "marginBottom": 0.7,
+        "marginLeft": 0.7,
+        "marginRight": 0.7,
+        "paperWidth": 8.27,
+        "paperHeight": 11.69,
+    })
+
+    if pdf_result and "data" in pdf_result:
+        pdf_bytes = base64.b64decode(pdf_result["data"])
+        with open(PDF_PATH, "wb") as f:
+            f.write(pdf_bytes)
+        print(f"PDF generado: {PDF_PATH} ({len(pdf_bytes)} bytes)")
+    else:
+        print("Error: no se recibieron datos del PDF")
+        sys.exit(1)
+
+except Exception as e:
+    print(f"Error: {e}")
+    sys.exit(1)
+finally:
+    proc.terminate()
+    proc.wait()
+    time.sleep(0.5)
+    # Cleanup temp profile
+    try:
+        shutil.rmtree(user_dir, ignore_errors=True)
+    except Exception:
+        pass
