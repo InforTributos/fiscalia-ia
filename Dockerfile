@@ -8,6 +8,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ENV PYTHONPATH=/app/microservice
+
 COPY --from=builder /install /usr/local
 
 COPY microservice/ ./microservice/

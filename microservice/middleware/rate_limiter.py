@@ -2,7 +2,8 @@ import logging
 import time
 from collections import defaultdict
 
-from fastapi import HTTPException, Request
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
@@ -42,9 +43,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
                 if len(self._requests[client_key]) >= max_req:
                     logger.warning("Rate limit excedido para %s", client_key)
-                    raise HTTPException(
+                    return JSONResponse(
                         status_code=429,
-                        detail={
+                        content={
                             "error": "RATE_LIMIT_EXCEEDED",
                             "mensaje": f"Límite de requests excedido. Intente en {window} segundos.",
                         },

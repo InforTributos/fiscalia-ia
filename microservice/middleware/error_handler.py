@@ -4,6 +4,7 @@ from domain.errors import FiscalIAError
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger("fiscalia")
 
@@ -29,6 +30,19 @@ def register_error_handlers(app: FastAPI):
                 "mensaje": exc.mensaje,
                 "request_id": _request_id(request),
             },
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        logger.warning({
+            "event": "http_error",
+            "request_id": _request_id(request),
+            "status_code": exc.status_code,
+            "mensaje": str(exc.detail),
+        })
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.detail if isinstance(exc.detail, dict) else {"error": "HTTP_ERROR", "mensaje": str(exc.detail)},
         )
 
     @app.exception_handler(RequestValidationError)
