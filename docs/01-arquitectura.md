@@ -134,7 +134,7 @@ Sin DI framework. `routers/analisis.py` y `proceso.py` instancian dependencias d
 | LLM | `LLMService` (fallback 3 tiers) |
 | ContribuyenteRepo | `queries.obtener_contribuyente` |
 | ProcesoRepo | `queries` (crear/obtener/actualizar) |
-| MCP Client | `OracleMCPAdapter` |
+| Oracle Client | `OracleClient` (oracledb pool async directo) |
 
 Si mañana se cambia PostgreSQL por Oracle, se cambia `infrastructure/persistence/queries.py` sin tocar dominio.
 
@@ -171,6 +171,7 @@ fiscalia-ia/
 │   ├── ports/
 │   │   ├── contribuyente_repo.py
 │   │   ├── llm_port.py
+│   │   ├── lookup_repository.py
 │   │   └── proceso_repo.py
 │   └── services/
 │       ├── crosscheck_service.py
@@ -191,9 +192,12 @@ fiscalia-ia/
 │   │   ├── client_adapter.py
 │   │   ├── pagination.py
 │   │   └── classify.py
-│   └── persistence/
-│       ├── connection.py
-│       └── queries.py
+│   ├── persistence/
+│   │   ├── connection.py
+│   │   ├── queries.py
+│   │   ├── repositorio_proceso.py
+│   │   ├── repositorio_contribuyente.py
+│   │   └── repositorio_lookup.py
 ├── middleware/
 │   └── error_handler.py
 ├── routers/

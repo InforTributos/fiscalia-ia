@@ -40,16 +40,14 @@ tags: [todo, backlog, tech-debt]
 >
 > **Bug relacionado encontrado:** `infrastructure/mcp/pagination.py:23` (`OBTENER_CONTRIBUYENTE_SQL`) trae `se.cdgo_sjto_estdo AS regimen` — es decir, usa el código de **estado** del sujeto (`DF_S_SUJETOS_ESTADO`) pero lo etiqueta como si fuera el **régimen tributario** (COMUN/SIMPLIFICADO). Son conceptos distintos; parece un error de mapeo/copy-paste. Revisar de dónde debería salir realmente el régimen tributario.
 
-### 🟡 Documentación de arquitectura MCP desactualizada/contradictoria
+### ✅ Documentación de arquitectura actualizada (RESUELTO)
 
 | Campo | Valor |
 |---|---|
-| **Archivos afectados** | `docs/01-arquitectura.md`, `docs/03-contrato-mcp.md`, `docs/08-especificacion-agentes.md`, `docs/11-oracle-mcp-server.md`, `AGENTS.md` |
-| **Problema** | Todos describen que el microservicio consume Oracle **exclusivamente** vía un Oracle MCP Server gestionado (Streamable HTTP + OAuth Bearer, o alternativamente stdio según el archivo — ni siquiera coinciden entre ellos). En la realidad, `application/use_cases/orquestar_proceso.py` y `routers/analisis.py` usan `infrastructure/mcp/oracle_adapter.py:OracleClient`, que es **conexión directa con `oracledb`** (pool async), sin protocolo MCP de por medio. `MEMORY/CONTEXT.md` sí documenta correctamente esto último con una nota de advertencia. |
-| **Nota** | Sí existe un servidor MCP real en el repo (`infrastructure/mcp/mcp_server.py`, stdio, tools `obtener_candidatos`/`obtener_datos_fiscales`/`buscar_contribuyentes`) — pero es una **herramienta de desarrollo** (la usa Claude Code en esta sesión como `mcp__fiscalia-negocio__*`) para inspeccionar/validar datos de Oracle, no algo que el microservicio FastAPI llame en producción. |
-| **Fix** | Reconciliar la documentación técnica: o se actualiza para reflejar "conexión directa oracledb en producción + MCP local solo como herramienta de desarrollo", o se retoma el plan original de MCP gestionado de Oracle como capa de producción (esto sí sería desarrollo nuevo). Requiere decisión explícita, no es solo un fix de texto. |
-| **Bloqueado por** | Decisión de arquitectura: ¿se mantiene oracledb directo en producción, o se migra al MCP Server gestionado de Oracle como documentado originalmente? |
-| **Descubierto** | 2026-07-08, revisión de fases pendientes contra el requerimiento |
+| **Archivos afectados** | `docs/01-arquitectura.md`, `docs/03-contrato-mcp.md`, `AGENTS.md` |
+| **Fix** | Se actualizaron para reflejar conexión directa `oracledb`. `docs/03-contrato-mcp.md` reescrito completamente: describe `OracleClient` con pool async, queries reales, lookup repository. `AGENTS.md` actualizado: test count 192, periodo parametrizado, MCP Contract describe conexión directa. |
+| **Decisión** | Se mantiene `oracledb` directo en producción. No hay servidor MCP gestionado de por medio. |
+| **Resuelto** | 2026-07-09 |
 
 ### 🟡 Coverage gate de CI (80%) vs. cap real (~72%)
 

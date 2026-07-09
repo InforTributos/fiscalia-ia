@@ -15,7 +15,7 @@ uvicorn main:app --reload  # from microservice/ directory
 |---|---|
 | Lint | `ruff check microservice/ tests/` |
 | Format | `ruff format microservice/ tests/` |
-| All tests | `PYTHONPATH=microservice pytest tests/unit/ -v` |
+| All tests | `PYTHONPATH=microservice pytest tests/unit/ tests/integration/ --ignore=tests/integration/test_llm_real.py -v` |
 | Single test | `PYTHONPATH=microservice pytest tests/unit/test_crosscheck.py -v` |
 | Coverage | `PYTHONPATH=microservice pytest tests/unit/ --cov=microservice --cov-report=term` |
 | Coverage gate | `PYTHONPATH=microservice pytest tests/unit/ --cov=microservice --cov-fail-under=80` |
@@ -27,11 +27,11 @@ uvicorn main:app --reload  # from microservice/ directory
 Hexagonal (Ports & Adapters) + DDD. Capas:
 
 - `domain/` — Pure logic: `services/crosscheck_service.py` (SRF), `services/inconsistency_service.py`, `errors.py`. Zero external deps.
-- `domain/ports/` — ABCs: `LLMProvider`, `ContribuyenteRepo`, `ProcesoRepo`.
+- `domain/ports/` — ABCs: `LLMProvider`, `ContribuyenteRepo`, `ProcesoRepo`, `LookupRepository`.
 - `application/use_cases/` — `orquestar_proceso.py` (orchestrator, accepts repos by constructor).
 - `infrastructure/llm/` — 4 providers: Anthropic, OpenAI, NVIDIA NIM, HuggingFace. Fallback via `llm_service.py`.
-- `infrastructure/persistence/` — `connection.py` (asyncpg pool), `queries.py` (17 CRUD fns), `repositorio_*.py` (concrete repos).
-- `infrastructure/mcp/` — Oracle MCP adapter stdio + pagination + classify.
+- `infrastructure/persistence/` — `connection.py` (asyncpg pool), `queries.py` (17 CRUD fns), `repositorio_proceso.py`, `repositorio_lookup.py`.
+- `infrastructure/mcp/` — `oracle_adapter.py` (OracleClient, pool async oracledb directo), `pagination.py` (4 generadores de descubrimiento), `classify.py`.
 - `routers/` — FastAPI endpoints. Routers instantiate `PostgresProcesoRepo()` directly.
 - `middleware/` — `error_handler.py` (catches `FiscalIAError`), `logging.py`, `rate_limiter.py`.
 - `tasks/` — `analisis_task.py` (background), `retry.py` (tenacity).
@@ -46,7 +46,7 @@ Hexagonal (Ports & Adapters) + DDD. Capas:
 - **Pool**: asyncpg pool lifecycle managed by FastAPI lifespan in `main.py`. Configurable via `POOL_MIN_SIZE`, `POOL_MAX_SIZE`, `POOL_TIMEOUT` env vars.
 - **Routers import repos at module level**: `repo = PostgresProcesoRepo()` — not via DI framework.
 - **Config env vars**: `LLM_TIER1_*`, `LLM_TIER2_*`, `LLM_TIER3_*`, `POSTGRES_*`. `.env.example` is the source of truth for naming.
-- **`orquestar_proceso.py`** hardcodes `periodo="2024"` — needs parametrizing.
+- **`orquestar_proceso.py`** recibe `periodo` desde `criteria` — ya no está hardcodeado.
 
 ## Gotchas
 
@@ -102,19 +102,21 @@ Granularity: timeout LLM = 1 error per NIT, multiple validations = multiple erro
 
 ## MCP Contract
 
-The service does NOT connect to Oracle directly. All fiscal data is obtained via MCP Server (stdio).
+The service DOES connect to Oracle directly via `oracledb` pool (async). See `docs/03-contrato-mcp.md` for details.
 
-**`buscar_contribuyentes`** — Get candidate NITs by criteria:
-`vigencia_ini`, `vigencia_fin`, `tipo_regimen`, `actividades_economicas`, `periodo`, `page`, `page_size`
+**Pre-filtro (batch)**: `tasks/analisis_task.py:pre_filtrar()` runs 4 discovery queries:
+- `obtener_omisos_conocidos` — registered taxpayers without ICA declarations
+- `obtener_omisos_desconocidos` — DIAN-detected taxpayers not in municipal registry
+- `obtener_inexactos_ciiu` — CIIU declaration vs DIAN mismatch
+- `obtener_inexactos_retenciones` — withholding discrepancies > threshold
 
-**`obtener_datos_fiscales`** — Get full fiscal data for a NIT:
-`nit`, `periodo` → returns `razon_social`, `ciiu`, `regimen`, `declaraciones_ica`, `exogena_dian`, `rues_estado`
-
-Post-MCP classification: no ICA declarations → **OMISO**, declarations match exogena → **EXACTO**, anomalies → **INEXACTO**.
+Post-discovery classification: no ICA declarations → **OMISO**, anomalies → **INEXACTO**.
 
 ## Docs
 
-Start with `docs/01-arquitectura.md` for the big picture. `docs/09-plan-desarrollo.md` has the roadmap and current status (116 tests, 72% coverage).
+Start with `docs/01-arquitectura.md` for the big picture. `docs/09-plan-desarrollo.md` has the roadmap and current status (192 tests, 72% coverage).
+
+## Gotchas (continued)
 
 ## Project Memory
 
