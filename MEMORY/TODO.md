@@ -11,6 +11,56 @@ tags: [todo, backlog, tech-debt]
 
 ## Pendientes inmediatos
 
+### ✅ POST /proceso ya ejecuta descubrimiento y clasificación (RESUELTO)
+
+| Campo | Valor |
+|---|---|
+| **Archivos** | `tasks/analisis_task.py` (nueva función `pre_filtrar()`) |
+| **Fix** | `analizar_proceso()` ahora recibe `criteria`, llama `pre_filtrar()` como Fase 1: conecta Oracle, ejecuta 4 queries de descubrimiento (`obtener_omisos_conocidos`, `obtener_omisos_desconocidos`, `obtener_inexactos_ciiu`, `obtener_inexactos_retenciones`) e inserta candidatos en `proceso_detalle` con clasificación OMISO/INEXACTO. Luego Fase 2 lee `proceso_detalle` y ejecuta el orquestador. Periodo parametrizado desde `criteria`. |
+| **Tests** | 5 unitarios (`test_analisis_task.py`) + 3 de integración que cubren: flujo completo mixto, sin candidatos, error parcial en generador. |
+| **Resuelto** | 2026-07-09, sesión de worktree |
+
+### 🔴 Cruce con RUES/Confecámaras no implementado (stub vacío)
+
+| Campo | Valor |
+|---|---|
+| **Archivo** | `infrastructure/mcp/pagination.py` — `obtener_datos_fiscales()` |
+| **Problema** | La función retorna siempre `"rues_estado": ""` (hardcodeado, línea ~130). No existe ninguna query, puerto o repositorio que consulte el estado real en RUES/Confecámaras — no hay ni un solo `grep` de una tabla o servicio RUES en toda la base de código. |
+| **Impacto en el cálculo del SRF** | En `domain/services/crosscheck_service.py:calcular_srf()`, el componente `estado_rues` (peso 20/100) evalúa `rues == "" or rues is None` → asigna **siempre** `PESO_RUES * 0.5` = 10 puntos fijos a **todos** los contribuyentes, sin importar su estado real. Esto infla artificialmente el SRF de forma pareja y resta precisión al puntaje de riesgo que se le vende al cliente como "objetivo". |
+| **Relación con el requerimiento** | `docs/08-especificacion-agentes.md` (AGT-01 CrossCheck) define explícitamente el cruce contra "exógena DIAN, RUES/Confecámaras y padrón ICA" como una de las 3 fuentes obligatorias. Es una de las 4 fuentes/componentes del SRF prometidos, no una función opcional. |
+| **Fix** | Definir la fuente de datos RUES (¿tabla Oracle propia, servicio externo de Confecámaras, o archivo de carga manual?) y conectar la consulta real en `obtener_datos_fiscales()`. Requiere definición de negocio: hoy no está claro de dónde saldría ese dato. |
+| **Bloqueado por** | Definición de fuente de datos RUES con el cliente/negocio |
+| **Descubierto** | 2026-07-08, revisión de fases pendientes contra el requerimiento |
+| **Impacto en informe cliente** | El documento `docs/cliente/propuesta-desarrollo-fiscalia.md` (sección 3, paso 2) promete explícitamente el cruce con "su estado en el registro mercantil (RUES)" como parte del flujo — hoy esto no ocurre. |
+
+> [!info] Confirmado: no existe en el esquema real de Oracle
+> `docs/changes/002-metodologia-candidatos-ica/design.md` (línea 54, tabla "Mapeo de tablas Oracle") ya documenta esto explícitamente: `| rues | (no tiene equivalente directo — se usa SI_I_PERSONAS para CIIU y estado) |`. Es decir, el equipo ya investigó esto al migrar del esquema genérico al esquema real de Taxation Smart/GENESYS y confirmó que **no hay tabla RUES/Cámara de Comercio en la base Oracle del municipio**. No es que falte conectar una query existente — la fuente de datos externa simplemente no está en esta base de datos y tendría que integrarse desde afuera (API de Confecámaras/RUES, o cargue periódico).
+>
+> **Proxy interno parcial que sí existe (no es RUES, pero es lo más cercano):** `SI_I_SUJETOS_IMPUESTO.id_sjto_estdo` / `estdo_blqdo` / `fcha_cnclcion` y la tabla catálogo `DF_S_SUJETOS_ESTADO` reflejan el estado del contribuyente **dentro del propio sistema de Hacienda municipal** (activo/bloqueado/cancelado), no su estado en el registro mercantil nacional. Es una señal distinta — un contribuyente puede estar activo en Cámara de Comercio pero bloqueado en el sistema municipal, o viceversa — pero es un dato real ya disponible que hoy no se usa para el componente `estado_rues` del SRF.
+>
+> **Bug relacionado encontrado:** `infrastructure/mcp/pagination.py:23` (`OBTENER_CONTRIBUYENTE_SQL`) trae `se.cdgo_sjto_estdo AS regimen` — es decir, usa el código de **estado** del sujeto (`DF_S_SUJETOS_ESTADO`) pero lo etiqueta como si fuera el **régimen tributario** (COMUN/SIMPLIFICADO). Son conceptos distintos; parece un error de mapeo/copy-paste. Revisar de dónde debería salir realmente el régimen tributario.
+
+### 🟡 Documentación de arquitectura MCP desactualizada/contradictoria
+
+| Campo | Valor |
+|---|---|
+| **Archivos afectados** | `docs/01-arquitectura.md`, `docs/03-contrato-mcp.md`, `docs/08-especificacion-agentes.md`, `docs/11-oracle-mcp-server.md`, `AGENTS.md` |
+| **Problema** | Todos describen que el microservicio consume Oracle **exclusivamente** vía un Oracle MCP Server gestionado (Streamable HTTP + OAuth Bearer, o alternativamente stdio según el archivo — ni siquiera coinciden entre ellos). En la realidad, `application/use_cases/orquestar_proceso.py` y `routers/analisis.py` usan `infrastructure/mcp/oracle_adapter.py:OracleClient`, que es **conexión directa con `oracledb`** (pool async), sin protocolo MCP de por medio. `MEMORY/CONTEXT.md` sí documenta correctamente esto último con una nota de advertencia. |
+| **Nota** | Sí existe un servidor MCP real en el repo (`infrastructure/mcp/mcp_server.py`, stdio, tools `obtener_candidatos`/`obtener_datos_fiscales`/`buscar_contribuyentes`) — pero es una **herramienta de desarrollo** (la usa Claude Code en esta sesión como `mcp__fiscalia-negocio__*`) para inspeccionar/validar datos de Oracle, no algo que el microservicio FastAPI llame en producción. |
+| **Fix** | Reconciliar la documentación técnica: o se actualiza para reflejar "conexión directa oracledb en producción + MCP local solo como herramienta de desarrollo", o se retoma el plan original de MCP gestionado de Oracle como capa de producción (esto sí sería desarrollo nuevo). Requiere decisión explícita, no es solo un fix de texto. |
+| **Bloqueado por** | Decisión de arquitectura: ¿se mantiene oracledb directo en producción, o se migra al MCP Server gestionado de Oracle como documentado originalmente? |
+| **Descubierto** | 2026-07-08, revisión de fases pendientes contra el requerimiento |
+
+### 🟡 Coverage gate de CI (80%) vs. cap real (~72%)
+
+| Campo | Valor |
+|---|---|
+| **Archivo** | `.github/workflows/ci.yml` |
+| **Problema** | El job `test` corre `pytest --cov-fail-under=80`, pero `docs/09-plan-desarrollo.md` y `MEMORY/TODO.md` documentan un cap real de ~72% sin PostgreSQL/MCP/LLM reales. Si esto sigue siendo cierto, el pipeline de CI debería estar fallando en cada push/PR. |
+| **Fix** | Verificar el estado real del último run de CI en GitHub Actions. Si sigue en 72%, bajar el gate a un valor alcanzable en CI (ej. 70%) y subir el gate real solo cuando haya tests de integración con infra real. |
+| **Bloqueado por** | — |
+| **Descubierto** | 2026-07-08, revisión de fases pendientes contra el requerimiento |
+
 ### 🔴 Periodo hardcodeado
 
 | Campo | Valor |

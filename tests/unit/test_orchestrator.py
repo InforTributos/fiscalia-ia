@@ -42,7 +42,7 @@ def mock_mcp_omiso():
 
 async def test_ejecutar_omiso(mock_mcp_omiso, mock_llm, mock_repo):
     orch = ProcesoOrchestrator(mock_llm, mock_repo)
-    await orch.ejecutar(proceso_id="test-id", intento_id=1, nit="9003189639", detalle_id=42)
+    await orch.ejecutar(proceso_id="test-id", intento_id=1, nit="9003189639", detalle_id=42, periodo="2024")
     mock_repo.actualizar_resultado_detalle.assert_awaited_once()
 
 
@@ -58,7 +58,7 @@ async def test_ejecutar_inexacto(mock_llm, mock_repo):
             "rues_estado": "ACTIVO",
         }
         orch = ProcesoOrchestrator(mock_llm, mock_repo)
-        await orch.ejecutar(proceso_id="test-id", intento_id=1, nit="9003189639", detalle_id=42)
+        await orch.ejecutar(proceso_id="test-id", intento_id=1, nit="9003189639", detalle_id=42, periodo="2024")
         mock_repo.actualizar_resultado_detalle.assert_awaited_once()
 
 
@@ -67,5 +67,5 @@ async def test_ejecutar_error_mcp(mock_llm, mock_repo):
          patch("application.use_cases.orquestar_proceso.obtener_datos_fiscales") as odf:
         odf.side_effect = Exception("MCP connection error")
         orch = ProcesoOrchestrator(mock_llm, mock_repo)
-        await orch.ejecutar(proceso_id="test-id", intento_id=1, nit="9003189639", detalle_id=42)
+        await orch.ejecutar(proceso_id="test-id", intento_id=1, nit="9003189639", detalle_id=42, periodo="2024")
         mock_repo.insertar_error_detalle.assert_awaited_once()

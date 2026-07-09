@@ -66,3 +66,11 @@ class ConfiguracionInvalidaError(FiscalIAError):
 
     def __init__(self, campo: str, detalle: str):
         super().__init__(f"Configuración inválida: {campo} — {detalle}")
+
+
+class LookupError(FiscalIAError):
+    codigo = "LOOKUP_ERROR"
+    status_code = 500
+
+    def __init__(self, entidad: str, detalle: str):
+        super().__init__(f"Error de resolución: {entidad} — {detalle}")

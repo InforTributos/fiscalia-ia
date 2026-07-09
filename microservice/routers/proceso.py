@@ -53,7 +53,7 @@ async def crear_proceso(req: ProcesoRequest):
     await repo.actualizar_estado_proceso(proceso_id, "EN_COLA")
     await repo.actualizar_estado_intento(intento_id, "EN_COLA")
 
-    asyncio.create_task(analizar_proceso(str(proceso_id), intento_id))
+    asyncio.create_task(analizar_proceso(str(proceso_id), intento_id, criteria))
 
     return ProcesoResponse(
         proceso_id=proceso_id,
@@ -64,7 +64,7 @@ async def crear_proceso(req: ProcesoRequest):
         resumen=ProcesoResumen(),
         proceso_analisis=ProcesoAnalisis(
             estado="EN_COLA",
-            mensaje="Proceso encolado. Pendiente de conexión MCP para pre-filtrado y análisis IA.",
+            mensaje="Proceso creado. Iniciando pre-filtrado de candidatos en Oracle.",
         ),
         created_at=__import__("datetime").datetime.now(),
     )

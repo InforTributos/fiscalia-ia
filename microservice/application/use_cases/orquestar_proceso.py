@@ -21,7 +21,7 @@ class ProcesoOrchestrator:
         self.llm = llm_service or LLMService()
         self.proceso_repo = proceso_repo or PostgresProcesoRepo()
 
-    async def ejecutar(self, proceso_id: str, intento_id: int, nit: str, detalle_id: int, periodo: str = "2024"):
+    async def ejecutar(self, proceso_id: str, intento_id: int, nit: str, detalle_id: int, periodo: str):
         logger.info("Orquestador: analizando NIT %s (detalle %d, periodo %s)", nit, detalle_id, periodo)
 
         try:

@@ -51,5 +51,24 @@
   },
   "skills": {
     "paths": [".opencode/skills"]
+  },
+  "mcp": {
+    "engram": {
+      "type": "local",
+      "command": [
+        "C:\\PROYECTOS\\work-space-IA\\shared\\bin\\engram.exe",
+        "mcp",
+        "--tools=agent"
+      ],
+      "enabled": true,
+      "environment": {
+        "ENGRAM_DATA_DIR": "C:\\PROYECTOS\\IA\\fiscalia-ia\\.engram"
+      }
+    },
+    "oracle-db": {
+      "type": "local",
+      "command": ["node", "scripts/run-oracle-mcp.js"],
+      "enabled": true
+    }
   }
 }

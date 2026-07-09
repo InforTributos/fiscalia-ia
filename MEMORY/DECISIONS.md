@@ -248,12 +248,15 @@ tags: [decisions, architecture]
 | Campo | Valor |
 |---|---|
 | **Fecha** | F-03 |
-| **Estado** | ⚠️ En plan — no implementado en código |
+| **Estado** | ✅ Implementado — `routers/proceso.py:crear_proceso()` + `queries.obtener_proceso_por_criteria()` (actualizado 2026-07-08, esta entrada estaba desactualizada) |
 
-**Decisión:** Mismo `cliente_nit` + mismos `criteria` (por hash JSON deep equality) → nuevo intento con `numero_intento` incremental.
+**Decisión:** Mismo `cliente_id` + mismos `criteria` → nuevo intento con `numero_intento` incremental.
 
-**Comportamiento planeado:**
-- Proceso `EN_PROCESO` → rechazar con 409 `PROCESO_EN_PROCESO`
-- Proceso `COMPLETADO`/`ERROR` → nuevo intento incremental
+**Comportamiento implementado:**
+- Proceso `EN_PROCESO`/`EN_COLA`/`PREFILTRANDO`/`PENDIENTE` con mismos criteria → rechazar con 409 `ProcesoEnProcesoError`
+- Proceso `COMPLETADO`/`ERROR`/`INTERRUMPIDO` → nuevo intento incremental (`numero_intento = intentos_total + 1`)
 - Re-solo NITs fallidos → **no soportado en V1**
 - Resultados anteriores se preservan (historial de intentos)
+
+> [!warning] No es hash — es comparación de texto JSON
+> La comparación real es `criteria::text = $2::text` (`infrastructure/persistence/queries.py:48`), es decir texto JSON serializado, no un hash canónico. Si `json.dumps(criteria)` produce el mismo dict con distinto orden de keys, la comparación de texto podría no detectar que son "los mismos criterios". Riesgo bajo en la práctica porque `criteria` se construye siempre con el mismo orden de keys en `crear_proceso()`, pero es una fragilidad a tener presente si se refactoriza ese diccionario.

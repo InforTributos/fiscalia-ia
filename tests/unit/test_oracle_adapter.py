@@ -31,12 +31,12 @@ async def test_initialize_crea_pool(mock_oracledb, mock_settings):
 
     mock_dsn = MagicMock()
     mock_oracledb.makedsn.return_value = mock_dsn
-    mock_oracledb.create_pool_async = AsyncMock(return_value=AsyncMock())
+    mock_oracledb.create_pool_async = MagicMock(return_value=AsyncMock())
 
     client = OracleClient()
     await client.initialize()
     mock_oracledb.makedsn.assert_called_once_with("192.168.1.1", 1521, service_name="TESTDB")
-    mock_oracledb.create_pool_async.assert_awaited_once()
+    mock_oracledb.create_pool_async.assert_called_once()
 
 
 @pytest.mark.asyncio

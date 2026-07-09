@@ -1,5 +1,6 @@
 import logging
 
+from domain.ports.lookup_repository import LookupRepository
 from infrastructure.mcp.oracle_adapter import OracleClient
 
 logger = logging.getLogger(__name__)
@@ -18,24 +19,38 @@ OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 """
 
 OBTENER_CONTRIBUYENTE_SQL = """
-SELECT c.nit, c.razon_social, c.ciiu, c.regimen, r.rues_estado
-FROM contribuyentes c
-LEFT JOIN rues r ON c.nit = r.nit
-WHERE c.nit = :nit
+SELECT s.idntfccion AS nit, p.nmbre_rzon_scial AS razon_social,
+       p.id_actvdad_ecnmca AS ciiu, se.cdgo_sjto_estdo AS regimen,
+       si.id_sjto_impsto
+FROM GENESYS.SI_C_SUJETOS s
+JOIN GENESYS.SI_I_SUJETOS_IMPUESTO si ON s.id_sjto = si.id_sjto
+JOIN GENESYS.SI_I_PERSONAS p ON si.id_sjto_impsto = p.id_sjto_impsto
+LEFT JOIN GENESYS.DF_S_SUJETOS_ESTADO se ON si.id_sjto_estdo = se.id_sjto_estdo
+JOIN GENESYS.DF_C_IMPUESTOS i ON si.id_impsto = i.id_impsto
+WHERE s.idntfccion = :nit AND i.cdgo_impsto = 'ICA'
 """
 
 OBTENER_DECLARACIONES_SQL = """
-SELECT periodo, base_gravable, tarifa, impuesto
-FROM declaraciones_ica
-WHERE nit = :nit AND periodo = :periodo
-ORDER BY periodo
+SELECT d.vgncia AS periodo, d.bse_grvble AS base_gravable,
+       d.vlor_ttal AS impuesto, d.vlor_pago
+FROM GENESYS.GI_G_DECLARACIONES d
+JOIN GENESYS.GI_D_DCLRCNES_VGNCIAS_FRMLR dvf
+    ON d.id_dclrcion_vgncia_frmlrio = dvf.id_dclrcion_vgncia_frmlrio
+JOIN GENESYS.GI_D_FORMULARIOS f ON dvf.id_frmlrio = f.id_frmlrio
+WHERE d.id_sjto_impsto = :id_sjto_impsto
+  AND d.vgncia = :periodo
+  AND d.cdgo_dclrcion_estdo = 'PRS'
+  AND d.fcha_anlcion IS NULL
+  AND f.cdgo_frmlrio LIKE 'FUN%'
+ORDER BY d.vgncia
 """
 
 OBTENER_EXOGENA_SQL = """
-SELECT periodo, ingresos
-FROM exogena_dian
-WHERE nit = :nit AND periodo = :periodo
-ORDER BY periodo
+SELECT vgncia_rtncion AS periodo, SUM(vlor_rtncion) AS ingresos
+FROM GENESYS.GI_G_EXOGENA_RETENCIONES
+WHERE idntfccion = :nit AND vgncia_rtncion = :periodo
+GROUP BY vgncia_rtncion
+ORDER BY vgncia_rtncion
 """
 
 
@@ -94,18 +109,25 @@ async def obtener_datos_fiscales(client: OracleClient, nit: str, periodo: str) -
         return None
 
     row = contribuyente[0] if isinstance(contribuyente, list) else contribuyente
+    id_sjto_impsto = row.get("id_sjto_impsto")
 
-    declaraciones = await client.execute_sql(OBTENER_DECLARACIONES_SQL, {"nit": nit, "periodo": periodo})
-    exogena = await client.execute_sql(OBTENER_EXOGENA_SQL, {"nit": nit, "periodo": periodo})
+    declaraciones = []
+    exogena = []
+    if id_sjto_impsto:
+        declaraciones = await client.execute_sql(
+            OBTENER_DECLARACIONES_SQL,
+            {"id_sjto_impsto": id_sjto_impsto, "periodo": periodo},
+        )
+        exogena = await client.execute_sql(OBTENER_EXOGENA_SQL, {"nit": nit, "periodo": periodo})
 
     return {
         "nit": row.get("nit", nit),
         "razon_social": row.get("razon_social", ""),
-        "ciiu": row.get("ciiu", ""),
+        "ciiu": str(row.get("ciiu", "") or ""),
         "regimen": row.get("regimen", ""),
         "declaraciones_ica": declaraciones if isinstance(declaraciones, list) else [],
         "exogena_dian": exogena if isinstance(exogena, list) else [],
-        "rues_estado": row.get("rues_estado", ""),
+        "rues_estado": "",
     }
 
 
@@ -114,17 +136,22 @@ SELECT s.idntfccion, p.nmbre_rzon_scial, p.id_actvdad_ecnmca,
        si.id_sjto_impsto, si.id_sjto_estdo, p.fcha_incio_actvddes, s.drccion
 FROM SI_I_SUJETOS_IMPUESTO si
 JOIN SI_I_PERSONAS p ON si.id_sjto_impsto = p.id_sjto_impsto
-JOIN SI_C_SUJETOS s ON p.id_sjto_impsto = s.id_sjto_impsto
+JOIN SI_C_SUJETOS s ON si.id_sjto = s.id_sjto
 WHERE si.id_impsto = :id_impsto_ica
   AND si.estdo_blqdo = 'N'
   AND p.fcha_incio_actvddes <= TO_DATE(:fin_periodo, 'YYYY-MM-DD')
   AND (si.fcha_cnclcion IS NULL OR si.fcha_cnclcion > TO_DATE(:fin_periodo, 'YYYY-MM-DD'))
   AND NOT EXISTS (
     SELECT 1 FROM GI_G_DECLARACIONES d
+    JOIN GI_D_DCLRCNES_VGNCIAS_FRMLR dvf
+        ON d.id_dclrcion_vgncia_frmlrio = dvf.id_dclrcion_vgncia_frmlrio
+    JOIN GI_D_FORMULARIOS f ON dvf.id_frmlrio = f.id_frmlrio
     WHERE d.id_sjto_impsto = si.id_sjto_impsto
       AND d.vgncia = :vigencia
-      AND d.cdgo_dclrcion_estdo IN ('VIGENTE', 'PRESENTADA')
+      AND d.cdgo_dclrcion_estdo = 'PRS'
       AND d.fcha_anlcion IS NULL
+      AND f.cdgo_frmlrio LIKE 'FUN%'
+      {payment_filter}
   )
   AND NOT EXISTS (
     SELECT 1 FROM FI_G_CANDIDATOS c
@@ -139,9 +166,9 @@ OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 """
 
 OMISOS_DESCONOCIDOS_DIAN_SQL = """
-SELECT d.nit, d.razon_social, d.ciiu, d.valor_dian, d.vgncia, 'DIAN' AS fuente
+SELECT d.nit, d.razon_social, d.ciiu, d.valor_dian, d.vigencia, 'DIAN' AS fuente
 FROM TEMP_RQ_DIAN d
-WHERE d.vgncia = :vigencia
+WHERE d.vigencia = :vigencia
   AND NOT EXISTS (
     SELECT 1 FROM SI_C_SUJETOS s WHERE s.idntfccion = d.nit
   )
@@ -161,26 +188,31 @@ OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 
 INEXACTOS_CIIU_SQL = """
 SELECT s.idntfccion, p.nmbre_rzon_scial,
-       det_ciiu.vlor AS ciiu_declarado,
-       det_tarifa.vlor AS tarifa_declarada,
+       TO_CHAR(det_ciiu.vlor) AS ciiu_declarado,
+       TO_CHAR(det_tarifa.vlor) AS tarifa_declarada,
        dian.ciiu AS ciiu_dian,
-       dian.trfa AS tarifa_dian
+       dian.tarifa AS tarifa_dian
 FROM GI_G_DECLARACIONES decl
+JOIN GI_D_DCLRCNES_VGNCIAS_FRMLR dvf
+    ON decl.id_dclrcion_vgncia_frmlrio = dvf.id_dclrcion_vgncia_frmlrio
+JOIN GI_D_FORMULARIOS frm ON dvf.id_frmlrio = frm.id_frmlrio
 JOIN SI_I_SUJETOS_IMPUESTO si ON decl.id_sjto_impsto = si.id_sjto_impsto
 JOIN SI_I_PERSONAS p ON si.id_sjto_impsto = p.id_sjto_impsto
-JOIN SI_C_SUJETOS s ON p.id_sjto_impsto = s.id_sjto_impsto
+JOIN SI_C_SUJETOS s ON si.id_sjto = s.id_sjto
 JOIN GI_G_DECLARACIONES_DETALLE det_ciiu
   ON decl.id_dclrcion = det_ciiu.id_dclrcion
-  AND det_ciiu.id_frmlrio_rgion_atrbto IN (5086, 4725)
+  AND det_ciiu.id_frmlrio_rgion_atrbto IN ({ciiu_ids})
 JOIN GI_G_DECLARACIONES_DETALLE det_tarifa
   ON decl.id_dclrcion = det_tarifa.id_dclrcion
-  AND det_tarifa.id_frmlrio_rgion_atrbto IN (5004)
-JOIN TEMP_RQ_DIAN dian ON s.idntfccion = dian.nit AND dian.vgncia = :vigencia
+  AND det_tarifa.id_frmlrio_rgion_atrbto IN ({tarifa_ids})
+JOIN TEMP_RQ_DIAN dian ON s.idntfccion = dian.nit AND dian.vigencia = :vigencia
 WHERE decl.vgncia = :vigencia
-  AND decl.cdgo_dclrcion_estdo IN ('VIGENTE', 'PRESENTADA')
+  AND decl.cdgo_dclrcion_estdo = 'PRS'
   AND decl.fcha_anlcion IS NULL
-  AND det_ciiu.vlor != dian.ciiu
-  AND TO_NUMBER(det_tarifa.vlor) < TO_NUMBER(dian.trfa)
+  AND frm.cdgo_frmlrio LIKE 'FUN%'
+  {payment_filter}
+  AND CAST(det_ciiu.vlor AS VARCHAR2(10)) != dian.ciiu
+  AND TO_NUMBER(CAST(det_tarifa.vlor AS VARCHAR2(10)), '9999999D99', 'NLS_NUMERIC_CHARACTERS=''.,''') < dian.tarifa
   AND NOT EXISTS (
     SELECT 1 FROM FI_G_CANDIDATOS c
     JOIN FI_G_CANDIDATOS_VIGENCIA cv ON c.id_cnddto = cv.id_cnddto
@@ -193,20 +225,23 @@ OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 
 INEXACTOS_RETENCIONES_SQL = """
 SELECT s.idntfccion, p.nmbre_rzon_scial,
-       det_ret_recibidas.vlor AS retenciones_declaradas_recibidas,
-       det_ret_practicadas.vlor AS retenciones_declaradas_practicadas,
+       TO_CHAR(det_ret_recibidas.vlor) AS retenciones_declaradas_recibidas,
+       TO_CHAR(det_ret_practicadas.vlor) AS retenciones_declaradas_practicadas,
        exo_recibidas.total_exo AS retenciones_exogena_recibidas,
        exo_practicadas.total_exo AS retenciones_exogena_practicadas
 FROM GI_G_DECLARACIONES decl
+JOIN GI_D_DCLRCNES_VGNCIAS_FRMLR dvf
+    ON decl.id_dclrcion_vgncia_frmlrio = dvf.id_dclrcion_vgncia_frmlrio
+JOIN GI_D_FORMULARIOS frm ON dvf.id_frmlrio = frm.id_frmlrio
 JOIN SI_I_SUJETOS_IMPUESTO si ON decl.id_sjto_impsto = si.id_sjto_impsto
 JOIN SI_I_PERSONAS p ON si.id_sjto_impsto = p.id_sjto_impsto
-JOIN SI_C_SUJETOS s ON p.id_sjto_impsto = s.id_sjto_impsto
+JOIN SI_C_SUJETOS s ON si.id_sjto = s.id_sjto
 LEFT JOIN GI_G_DECLARACIONES_DETALLE det_ret_recibidas
   ON decl.id_dclrcion = det_ret_recibidas.id_dclrcion
-  AND det_ret_recibidas.id_frmlrio_rgion_atrbto IN (717, 845, 1190, 5035)
+  AND det_ret_recibidas.id_frmlrio_rgion_atrbto IN ({ret_recibidas_ids})
 LEFT JOIN GI_G_DECLARACIONES_DETALLE det_ret_practicadas
   ON decl.id_dclrcion = det_ret_practicadas.id_dclrcion
-  AND det_ret_practicadas.id_frmlrio_rgion_atrbto IN (718, 846, 5036)
+  AND det_ret_practicadas.id_frmlrio_rgion_atrbto IN ({ret_practicadas_ids})
 LEFT JOIN (
   SELECT idntfccion, SUM(vlor_rtncion) AS total_exo
   FROM GI_G_EXOGENA_RETENCIONES
@@ -222,34 +257,41 @@ LEFT JOIN (
   GROUP BY idntfccion
 ) exo_practicadas ON s.idntfccion = exo_practicadas.idntfccion
 WHERE decl.vgncia = :vigencia
-  AND decl.cdgo_dclrcion_estdo IN ('VIGENTE', 'PRESENTADA')
+  AND decl.cdgo_dclrcion_estdo = 'PRS'
   AND decl.fcha_anlcion IS NULL
+  AND frm.cdgo_frmlrio LIKE 'FUN%'
+  {payment_filter}
   AND (
-    ABS(NVL(TO_NUMBER(det_ret_recibidas.vlor), 0) - NVL(exo_recibidas.total_exo, 0))
-      > :umbral * GREATEST(NVL(TO_NUMBER(det_ret_recibidas.vlor), 0), NVL(exo_recibidas.total_exo, 0), 1)
+    ABS(NVL(TO_NUMBER(CAST(det_ret_recibidas.vlor AS VARCHAR2(50)), '99999999999999999999D99', 'NLS_NUMERIC_CHARACTERS=''.,'''), 0) - NVL(exo_recibidas.total_exo, 0))
+      > :umbral * GREATEST(NVL(TO_NUMBER(CAST(det_ret_recibidas.vlor AS VARCHAR2(50)), '99999999999999999999D99', 'NLS_NUMERIC_CHARACTERS=''.,'''), 0), NVL(exo_recibidas.total_exo, 0), 1)
     OR
-    ABS(NVL(TO_NUMBER(det_ret_practicadas.vlor), 0) - NVL(exo_practicadas.total_exo, 0))
-      > :umbral * GREATEST(NVL(TO_NUMBER(det_ret_practicadas.vlor), 0), NVL(exo_practicadas.total_exo, 0), 1)
+    ABS(NVL(TO_NUMBER(CAST(det_ret_practicadas.vlor AS VARCHAR2(50)), '99999999999999999999D99', 'NLS_NUMERIC_CHARACTERS=''.,'''), 0) - NVL(exo_practicadas.total_exo, 0))
+      > :umbral * GREATEST(NVL(TO_NUMBER(CAST(det_ret_practicadas.vlor AS VARCHAR2(50)), '99999999999999999999D99', 'NLS_NUMERIC_CHARACTERS=''.,'''), 0), NVL(exo_practicadas.total_exo, 0), 1)
   )
 OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 """
 
 
-async def obtener_omisos_conocidos(client: OracleClient, vigencia, periodo, page_size=None):
+async def obtener_omisos_conocidos(client: OracleClient, lookup: LookupRepository, vigencia, periodo, page_size=None):
+    id_impsto_ica = await lookup.get_impuesto_id("ICA")
+    id_prgrma_omisos = await lookup.get_programa_id("O")
+    config = await lookup.get_configuracion_declaracion()
+    payment_filter = "" if config.ind_prsntcion_dclrcion == "A" else "AND d.vlor_pago > 0"
+    sql = OMISOS_CONOCIDOS_SQL.format(payment_filter=payment_filter)
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
 
     while True:
         params = {
-            "id_impsto_ica": "ICA",
-            "id_prgrma_omisos": "O",
+            "id_impsto_ica": id_impsto_ica,
+            "id_prgrma_omisos": id_prgrma_omisos,
             "vigencia": vigencia,
             "fin_periodo": f"{vigencia}-12-31",
             "offset": offset_val,
             "limit": size,
         }
-        result = await client.execute_sql(OMISOS_CONOCIDOS_SQL, params)
+        result = await client.execute_sql(sql, params)
         if not result:
             break
         items = result if isinstance(result, list) else [result]
@@ -265,14 +307,15 @@ async def obtener_omisos_conocidos(client: OracleClient, vigencia, periodo, page
     logger.info("Omisos conocidos: %d candidatos obtenidos", total)
 
 
-async def obtener_omisos_desconocidos(client: OracleClient, vigencia, page_size=None):
+async def obtener_omisos_desconocidos(client: OracleClient, lookup: LookupRepository, vigencia, page_size=None):
+    id_prgrma_omisos = await lookup.get_programa_id("OD")
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
 
     while True:
         params = {
-            "id_prgrma_omisos": "O",
+            "id_prgrma_omisos": id_prgrma_omisos,
             "vigencia": vigencia,
             "offset": offset_val,
             "limit": size,
@@ -293,20 +336,30 @@ async def obtener_omisos_desconocidos(client: OracleClient, vigencia, page_size=
     logger.info("Omisos desconocidos: %d candidatos obtenidos", total)
 
 
-async def obtener_inexactos_ciiu(client: OracleClient, periodo, page_size=None):
+async def obtener_inexactos_ciiu(client: OracleClient, lookup: LookupRepository, periodo, page_size=None):
+    atributos = await lookup.get_atributos_ica(periodo)
+    id_prgrma_inexactos = await lookup.get_programa_id("I")
+    config = await lookup.get_configuracion_declaracion()
+    payment_filter = "" if config.ind_prsntcion_dclrcion == "A" else "AND decl.vlor_pago > 0"
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
     vigencia = periodo
 
+    ciiu_ids_sql = ", ".join(str(a) for a in atributos.ciiu_ids)
+    tarifa_ids_sql = ", ".join(str(a) for a in atributos.tarifa_ids)
+    sql = INEXACTOS_CIIU_SQL.format(
+        ciiu_ids=ciiu_ids_sql, tarifa_ids=tarifa_ids_sql, payment_filter=payment_filter,
+    )
+
     while True:
         params = {
-            "id_prgrma_inexactos": "I",
+            "id_prgrma_inexactos": id_prgrma_inexactos,
             "vigencia": vigencia,
             "offset": offset_val,
             "limit": size,
         }
-        result = await client.execute_sql(INEXACTOS_CIIU_SQL, params)
+        result = await client.execute_sql(sql, params)
         if not result:
             break
         items = result if isinstance(result, list) else [result]
@@ -322,22 +375,36 @@ async def obtener_inexactos_ciiu(client: OracleClient, periodo, page_size=None):
     logger.info("Inexactos CIIU: %d candidatos obtenidos", total)
 
 
-async def obtener_inexactos_retenciones(client: OracleClient, periodo, page_size=None, umbral_pct=None):
+async def obtener_inexactos_retenciones(
+    client: OracleClient, lookup: LookupRepository, periodo, page_size=None, umbral_pct=None,
+):
+    atributos = await lookup.get_atributos_ica(periodo)
+    id_prgrma_inexactos = await lookup.get_programa_id("I")
+    config = await lookup.get_configuracion_declaracion()
+    payment_filter = "" if config.ind_prsntcion_dclrcion == "A" else "AND decl.vlor_pago > 0"
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
     vigencia = periodo
     umbral = (umbral_pct or 5.0) / 100.0
 
+    ret_recibidas_ids_sql = ", ".join(str(a) for a in atributos.ret_recibidas_ids)
+    ret_practicadas_ids_sql = ", ".join(str(a) for a in atributos.ret_practicadas_ids)
+    sql = INEXACTOS_RETENCIONES_SQL.format(
+        ret_recibidas_ids=ret_recibidas_ids_sql,
+        ret_practicadas_ids=ret_practicadas_ids_sql,
+        payment_filter=payment_filter,
+    )
+
     while True:
         params = {
-            "id_prgrma_inexactos": "I",
+            "id_prgrma_inexactos": id_prgrma_inexactos,
             "vigencia": vigencia,
             "umbral": umbral,
             "offset": offset_val,
             "limit": size,
         }
-        result = await client.execute_sql(INEXACTOS_RETENCIONES_SQL, params)
+        result = await client.execute_sql(sql, params)
         if not result:
             break
         items = result if isinstance(result, list) else [result]

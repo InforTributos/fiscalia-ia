@@ -60,6 +60,8 @@ def test_settings_oracle_vars_defaults():
         "LLM_TIER2_API_KEY": "",
         "LLM_TIER3_API_KEY": "",
         "POSTGRES_PASSWORD": "",
+        "ORACLE_HOST": "localhost",
+        "ORACLE_SERVICE": "",
         "ORACLE_USER": "",
         "ORACLE_PASSWORD": "",
     }

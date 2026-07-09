@@ -17,7 +17,7 @@ class OracleClient:
         global _pool
         if _pool is None:
             dsn = oracledb.makedsn(settings.oracle_host, settings.oracle_port, service_name=settings.oracle_service)
-            _pool = await oracledb.create_pool_async(
+            _pool = oracledb.create_pool_async(
                 user=settings.oracle_user,
                 password=settings.oracle_password,
                 dsn=dsn,
@@ -33,27 +33,23 @@ class OracleClient:
             await self.initialize()
         async with self._pool.acquire() as conn:
             cursor = conn.cursor()
-            try:
-                result = await cursor.execute(query, bind_params or {})
-                rows = await result.fetchall()
-                columns = [c[0].lower() for c in result.description] if result.description else []
-                return [dict(zip(columns, row)) for row in rows]
-            finally:
-                await cursor.close()
+            await cursor.execute(query, bind_params or {})
+            rows = await cursor.fetchall()
+            columns = [c[0].lower() for c in cursor.description] if cursor.description else []
+            cursor.close()
+            return [dict(zip(columns, row)) for row in rows]
 
     async def execute_sql_raw(self, query: str, bind_params: dict[str, Any] | None = None) -> Any:
         if self._pool is None:
             await self.initialize()
         async with self._pool.acquire() as conn:
             cursor = conn.cursor()
-            try:
-                result = await cursor.execute(query, bind_params or {})
-                rows = await result.fetchall()
-                if not rows:
-                    return None
-                return rows
-            finally:
-                await cursor.close()
+            await cursor.execute(query, bind_params or {})
+            rows = await cursor.fetchall()
+            cursor.close()
+            if not rows:
+                return None
+            return rows
 
     async def close(self):
         global _pool

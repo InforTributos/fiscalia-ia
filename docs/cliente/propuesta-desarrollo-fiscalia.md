@@ -69,7 +69,7 @@ Para que el sistema no dependa de un único proveedor de tecnología (lo cual se
 | **Ahorro de tiempo** | El cruce de información entre fuentes, que hoy es manual, se hace de forma automática. |
 | **Explicaciones listas para usar** | No se requiere que el funcionario interprete datos crudos; la IA entrega el análisis en lenguaje natural. |
 | **Trazabilidad** | Cada análisis queda registrado, con fecha, criterios usados y resultado — auditable en cualquier momento. |
-| **Sin cambiar de herramienta** | Se integra al sistema APEX que el equipo ya usa hoy, sin curva de aprendizaje adicional. |
+| **Sin cambiar de herramienta** | Se integra al Sistema Taxation Smart que el equipo ya usa hoy, sin curva de aprendizaje adicional. |
 | **Continuidad garantizada** | El esquema de respaldo entre proveedores de IA evita que una falla externa detenga la operación. |
 
 ## 6. Estado Actual del Desarrollo
@@ -80,7 +80,7 @@ El desarrollo ha avanzado en fases incrementales. A la fecha de este informe:
 |---|---|---|
 | Fase 1 | Base del sistema y conexión con la base de datos de procesos | ✅ Completada |
 | Fase 2 | Lógica de negocio: cálculo del puntaje de riesgo y reglas de clasificación | ✅ Completada |
-| Fase 3 | Puntos de integración con APEX (consultar, iniciar y revisar análisis) | ✅ Completada |
+| Fase 3 | Puntos de integración con el Sistema Taxation Smart (consultar, iniciar y revisar análisis) | ✅ Completada |
 | Fase 4 | Conexión con la información fiscal (Oracle) y procesamiento en segundo plano | 🟡 Parcial — ver nota |
 | Fase 5 | Motor de Inteligencia Artificial con esquema de respaldo de 3 niveles | ✅ Completada |
 | Fase 6 | Optimización de rendimiento y manejo de errores | ✅ Completada |
@@ -90,13 +90,13 @@ El sistema cuenta actualmente con **más de 115 pruebas automatizadas** que vali
 
 > **Nota sobre la Fase 4:** el análisis individual de un contribuyente (consulta puntual) ya funciona de extremo a extremo con las fuentes de ICA y exógena DIAN. Dos elementos de esta fase están pendientes de cerrar:
 > 1. La ejecución de este mismo análisis de forma **masiva y automática** sobre un lote completo de contribuyentes seleccionados por criterio (por ejemplo, "todos los del régimen común del sector comercio") — es un ajuste acotado sobre trabajo ya construido, no un desarrollo nuevo desde cero.
-> 2. El cruce con **RUES/Cámara de Comercio** — la integración API ya está disponible en APEX por parte del equipo de Hacienda. El componente del SRF que evalúa el estado mercantil (peso 20%) utilizará esta conexión. Pendiente definir qué información se necesita actualizar para proceder con la fiscalización (ver más abajo).
+> 2. El cruce con **RUES/Cámara de Comercio** — la integración API ya está disponible en el Sistema Taxation Smart por parte del equipo de Hacienda. El componente del SRF que evalúa el estado mercantil (peso 20%) utilizará esta conexión. Pendiente definir qué información se necesita actualizar para proceder con la fiscalización (ver más abajo).
 
 ### Pendientes que requieren definición de la Secretaría de Hacienda
 
 | Pendiente | Detalle | Responsable |
 |---|---|---|
-| Definición de información a actualizar para fiscalización con RUES | La integración API con RUES/Cámara de Comercio ya está disponible en APEX. Se requiere definir qué información específica del contribuyente se necesita actualizar o alimentar para que el proceso de fiscalización pueda proceder. | Secretaría de Hacienda / equipo de negocio |
+| Definición de información a actualizar para fiscalización con RUES | La integración API con RUES/Cámara de Comercio ya está disponible en el Sistema Taxation Smart. Se requiere definir qué información específica del contribuyente se necesita actualizar o alimentar para que el proceso de fiscalización pueda proceder. | Secretaría de Hacienda / equipo de negocio |
 
 ### Pendientes de desarrollo interno
 
@@ -105,7 +105,7 @@ Estos elementos sí son responsabilidad del equipo de desarrollo y se resolverá
 | Pendiente | Responsable |
 |---|---|
 | Conectar el descubrimiento y clasificación automática de contribuyentes al flujo de proceso por lote (hoy disponible solo para consulta individual) | Informática y Tributos S.A.S. |
-| Conectar el cruce con RUES al cálculo del puntaje de riesgo | Informática y Tributos S.A.S. — La integración API ya está disponible en APEX. Pendiente consumir el endpoint de estado mercantil desde el microservicio. |
+| Conectar el cruce con RUES al cálculo del puntaje de riesgo | Informática y Tributos S.A.S. — La integración API ya está disponible en el Sistema Taxation Smart. Pendiente consumir el endpoint de estado mercantil desde el microservicio. |
 
 ### Pendientes para la puesta en producción
 
@@ -113,7 +113,7 @@ Estos elementos no dependen del equipo de desarrollo, sino de la coordinación c
 
 | Pendiente | Responsable |
 |---|---|
-| Habilitación del acceso a la información fiscal real (Oracle) en el ambiente de producción | Equipo APEX / Infraestructura del municipio |
+| Habilitación del acceso a la información fiscal real (Oracle) en el ambiente de producción | Equipo del Sistema Taxation Smart / Infraestructura del municipio |
 | Aprovisionamiento del servidor donde correrá el sistema | Equipo de Infraestructura |
 | Activación de las credenciales de los proveedores de IA para el ambiente productivo | Definición conjunta |
 
