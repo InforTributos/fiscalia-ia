@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Propuesta de Desarrollo - Sistema de Fiscalizacion Inteligente de ICA</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 30px; line-height: 1.6; color: #333; }
+  h1 { color: #1a3c5e; border-bottom: 3px solid #1a3c5e; padding-bottom: 10px; }
+  h2 { color: #2c5f8a; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+  h3 { color: #3a7bb8; }
+  table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+  th, td { border: 1px solid #ccc; padding: 10px 12px; text-align: left; }
+  th { background-color: #2c5f8a; color: white; }
+  tr:nth-child(even) { background-color: #f5f8fb; }
+  blockquote { border-left: 4px solid #2c5f8a; margin: 20px 0; padding: 12px 20px; background: #f0f5fa; color: #555; }
+  strong { color: #1a3c5e; }
+  hr { border: none; border-top: 2px solid #ddd; margin: 30px 0; }
+  em { color: #666; }
+  ul, ol { margin: 10px 0; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<h1>Propuesta de Desarrollo — Sistema de Fiscalización Inteligente de ICA</h1>
+<p><strong>Preparado para:</strong> Alcaldía de Valledupar — Secretaría de Hacienda
+<strong>Preparado por:</strong> Informática y Tributos S.A.S.
+<strong>Proyecto:</strong> FiscalIA
+<strong>Fecha:</strong> 08 de julio de 2026</p>
+<hr />
+<h2>1. Contexto y Problema a Resolver</h2>
+<p>La Secretaría de Hacienda de Valledupar tiene la responsabilidad de fiscalizar el correcto pago del Impuesto de Industria y Comercio (ICA) por parte de miles de contribuyentes del municipio. Hoy en día, identificar quién no ha declarado, quién declaró de menos o quién aplicó una tarifa incorrecta es un proceso que depende en gran medida de la revisión manual, cruzando información dispersa entre distintas fuentes (declaraciones de ICA, información exógena de la DIAN, y el registro de cámara de comercio).</p>
+<p>Este proceso manual tiene tres limitaciones importantes:</p>
+<ul>
+<li><strong>Es lento:</strong> revisar contribuyente por contribuyente toma tiempo que el equipo de fiscalización no siempre tiene.</li>
+<li><strong>Es difícil de priorizar:</strong> sin un criterio objetivo, es complicado decidir a qué contribuyentes revisar primero.</li>
+<li><strong>Depende de la experiencia individual:</strong> el conocimiento para detectar inconsistencias está en la cabeza de los funcionarios más experimentados, no en un sistema que lo replique de forma consistente.</li>
+</ul>
+<h2>2. Objetivo de la Propuesta</h2>
+<p>Desarrollar <strong>FiscalIA</strong>, un sistema de apoyo a la fiscalización que automatiza el cruce de información entre las distintas fuentes de datos del municipio, calcula un puntaje objetivo de riesgo fiscal para cada contribuyente, y genera explicaciones claras en lenguaje natural sobre los hallazgos — para que el equipo de fiscalización pueda enfocar su tiempo en los casos que realmente lo ameritan, con criterios objetivos y trazables.</p>
+<p>FiscalIA <strong>no reemplaza al funcionario fiscalizador</strong>. Es una herramienta que hace el trabajo pesado de recopilar, cruzar y analizar información, y le entrega al funcionario un resumen listo para su revisión y decisión final.</p>
+<h2>3. ¿Cómo Funciona? (Visión General)</h2>
+<p>El sistema se integra directamente con <strong>Oracle APEX</strong>, la plataforma que la Secretaría de Hacienda ya usa hoy (Taxation Smart), por lo que no representa una herramienta nueva y aislada, sino una capacidad adicional dentro del flujo de trabajo actual del funcionario.</p>
+<p>El proceso, en términos simples, sigue estos pasos:</p>
+<ol>
+<li><strong>Selección de contribuyentes a revisar</strong> — el funcionario define criterios (por ejemplo: período fiscal, tipo de actividad económica, régimen tributario) desde la plataforma APEX.</li>
+<li><strong>Recolección automática de información</strong> — el sistema busca y reúne, para cada contribuyente, sus declaraciones de ICA y la información reportada a la DIAN (exógena). El cruce adicional con el registro mercantil (RUES/Cámara de Comercio) está contemplado en el diseño de la solución y cuenta con una integración a nivel de API en APEX (ver sección 6).</li>
+<li><strong>Cruce y análisis de la información</strong> — el sistema compara estas fuentes entre sí y calcula un <strong>Score de Riesgo Fiscal (SRF)</strong>, un puntaje de 0 a 100 que resume qué tan probable es que exista una irregularidad, junto con el tipo de irregularidad detectada (contribuyente que no declaró, que declaró de menos, que aplicó una tarifa equivocada, etc.).</li>
+<li><strong>Explicación en lenguaje natural</strong> — aquí es donde entra la Inteligencia Artificial (ver sección 4): el sistema no solo entrega un número, sino una explicación clara y en español corriente de por qué ese contribuyente tiene ese puntaje y qué se recomienda revisar.</li>
+<li><strong>Entrega de resultados al funcionario</strong> — todo el análisis queda disponible directamente en APEX, listo para que el fiscalizador lo revise y decida los siguientes pasos (esto último — la generación de actos formales como requerimientos o emplazamientos — queda fuera del alcance de esta primera versión y se evaluará como una fase futura).</li>
+</ol>
+<blockquote>
+<p><strong>Nota sobre el estado actual de este flujo:</strong> hoy el análisis completo (recolección, cruce, cálculo de SRF y explicación con IA) ya funciona de punta a punta para <strong>la consulta de un contribuyente puntual</strong>. La conexión que permite ejecutar este mismo flujo de forma <strong>masiva y automática sobre un lote completo de contribuyentes</strong> (pasos 1 a 3, cuando se seleccionan muchos contribuyentes a la vez con un criterio general) se encuentra en su etapa final de integración. Ver el detalle en la sección 6.</p>
+</blockquote>
+<h2>4. El Rol de la Inteligencia Artificial</h2>
+<p>Uno de los componentes centrales de esta propuesta es el uso de Inteligencia Artificial (modelos de lenguaje, la misma familia de tecnología detrás de asistentes como ChatGPT o Claude) para una tarea muy específica: <strong>traducir datos y cálculos técnicos en explicaciones que cualquier funcionario pueda entender y usar, sin necesitar conocimientos de análisis de datos.</strong></p>
+<h3>¿Qué hace exactamente la IA en este sistema?</h3>
+<ul>
+<li><strong>Explica el puntaje de riesgo:</strong> en lugar de mostrar solo "SRF: 78/100", la IA redacta una explicación como "Este contribuyente presenta un riesgo alto principalmente porque reportó a la DIAN ingresos muy superiores a los declarados en ICA, y su tarifa aplicada no corresponde a su actividad económica registrada."</li>
+<li><strong>Describe las inconsistencias encontradas:</strong> cuando el sistema detecta, por ejemplo, que un contribuyente subdeclaró ingresos, aplicó una exención sin soporte, o declaró base gravable en cero de forma injustificada, la IA redacta el hallazgo en un lenguaje claro, con contexto normativo cuando aplica.</li>
+<li><strong>Sugiere una recomendación de acción:</strong> una orientación inicial sobre qué tipo de revisión o requerimiento podría aplicar, siempre como insumo para que el funcionario decida — no como una decisión automática.</li>
+</ul>
+<h3>¿Qué NO hace la IA?</h3>
+<p>Es igual de importante ser claros en esto: la Inteligencia Artificial <strong>no decide, no sanciona ni emite ningún acto administrativo por sí sola.</strong> Su función se limita a <strong>generar explicaciones y resúmenes</strong> a partir de datos y cálculos que ya fueron determinados por reglas de negocio claras y verificables (el cálculo del puntaje de riesgo, por ejemplo, no lo hace la IA — lo hace una lógica fija y auditable; la IA solo lo explica en palabras). La decisión final siempre queda en manos del equipo de fiscalización de la Secretaría de Hacienda.</p>
+<h3>Confiabilidad: ¿qué pasa si el proveedor de IA falla?</h3>
+<p>Para que el sistema no dependa de un único proveedor de tecnología (lo cual sería un riesgo operativo), se diseñó un <strong>esquema de respaldo en cascada</strong>: si el proveedor principal de IA no está disponible en un momento dado, el sistema automáticamente intenta con un segundo proveedor, y si ese también falla, con un tercero. Esto garantiza continuidad del servicio incluso ante fallas externas, sin intervención manual. En el caso extremo de que ningún proveedor esté disponible, el sistema no se detiene: simplemente entrega el resultado del análisis sin la explicación en lenguaje natural, y continúa procesando el resto de los contribuyentes.</p>
+<h3>Manejo responsable de la información</h3>
+<ul>
+<li>La información fiscal de los contribuyentes se procesa dentro de la infraestructura contratada para el proyecto y bajo los controles de seguridad definidos (red privada, sin exposición pública, cifrado en tránsito).</li>
+<li>El tratamiento de datos tributarios está amparado por la normativa de protección de datos vigente en Colombia (Ley 1581 de 2012), que además excluye explícitamente los datos tributarios del régimen general de autorización, dado su carácter de información pública/administrativa dentro del marco legal aplicable.</li>
+</ul>
+<h2>5. Beneficios para la Secretaría de Hacienda</h2>
+<table>
+<thead>
+<tr>
+<th>Beneficio</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Priorización objetiva</strong></td>
+<td>El equipo de fiscalización sabe, con un criterio numérico y consistente, a qué contribuyentes revisar primero.</td>
+</tr>
+<tr>
+<td><strong>Ahorro de tiempo</strong></td>
+<td>El cruce de información entre fuentes, que hoy es manual, se hace de forma automática.</td>
+</tr>
+<tr>
+<td><strong>Explicaciones listas para usar</strong></td>
+<td>No se requiere que el funcionario interprete datos crudos; la IA entrega el análisis en lenguaje natural.</td>
+</tr>
+<tr>
+<td><strong>Trazabilidad</strong></td>
+<td>Cada análisis queda registrado, con fecha, criterios usados y resultado — auditable en cualquier momento.</td>
+</tr>
+<tr>
+<td><strong>Sin cambiar de herramienta</strong></td>
+<td>Se integra al Sistema Taxation Smart que el equipo ya usa hoy, sin curva de aprendizaje adicional.</td>
+</tr>
+<tr>
+<td><strong>Continuidad garantizada</strong></td>
+<td>El esquema de respaldo entre proveedores de IA evita que una falla externa detenga la operación.</td>
+</tr>
+</tbody>
+</table>
+<h2>6. Estado Actual del Desarrollo</h2>
+<p>El desarrollo ha avanzado en fases incrementales. A la fecha de este informe:</p>
+<table>
+<thead>
+<tr>
+<th>Fase</th>
+<th>Contenido</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fase 1</td>
+<td>Base del sistema y conexión con la base de datos de procesos</td>
+<td>✅ Completada</td>
+</tr>
+<tr>
+<td>Fase 2</td>
+<td>Lógica de negocio: cálculo del puntaje de riesgo y reglas de clasificación</td>
+<td>✅ Completada</td>
+</tr>
+<tr>
+<td>Fase 3</td>
+<td>Puntos de integración con el Sistema Taxation Smart (consultar, iniciar y revisar análisis)</td>
+<td>✅ Completada</td>
+</tr>
+<tr>
+<td>Fase 4</td>
+<td>Conexión con la información fiscal (Oracle) y procesamiento en segundo plano</td>
+<td>🟡 Parcial — ver nota</td>
+</tr>
+<tr>
+<td>Fase 5</td>
+<td>Motor de Inteligencia Artificial con esquema de respaldo de 3 niveles</td>
+<td>✅ Completada</td>
+</tr>
+<tr>
+<td>Fase 6</td>
+<td>Optimización de rendimiento y manejo de errores</td>
+<td>✅ Completada</td>
+</tr>
+<tr>
+<td>Fase 7</td>
+<td>Pruebas de calidad y automatización</td>
+<td>✅ Completada</td>
+</tr>
+</tbody>
+</table>
+<p>El sistema cuenta actualmente con <strong>más de 115 pruebas automatizadas</strong> que validan su correcto funcionamiento, y ha superado las validaciones de calidad de código establecidas para el proyecto.</p>
+<blockquote>
+<p><strong>Nota sobre la Fase 4:</strong> el análisis individual de un contribuyente (consulta puntual) ya funciona de extremo a extremo con las fuentes de ICA y exógena DIAN. Dos elementos de esta fase están pendientes de cerrar:
+1. La ejecución de este mismo análisis de forma <strong>masiva y automática</strong> sobre un lote completo de contribuyentes seleccionados por criterio (por ejemplo, "todos los del régimen común del sector comercio") — es un ajuste acotado sobre trabajo ya construido, no un desarrollo nuevo desde cero.
+2. El cruce con <strong>RUES/Cámara de Comercio</strong> — la integración API ya está disponible en el Sistema Taxation Smart por parte del equipo de Hacienda. El componente del SRF que evalúa el estado mercantil (peso 20%) utilizará esta conexión. Pendiente definir qué información se necesita actualizar para proceder con la fiscalización (ver más abajo).</p>
+</blockquote>
+<h3>Pendientes que requieren definición de la Secretaría de Hacienda</h3>
+<table>
+<thead>
+<tr>
+<th>Pendiente</th>
+<th>Detalle</th>
+<th>Responsable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Definición de información a actualizar para fiscalización con RUES</td>
+<td>La integración API con RUES/Cámara de Comercio ya está disponible en el Sistema Taxation Smart. Se requiere definir qué información específica del contribuyente se necesita actualizar o alimentar para que el proceso de fiscalización pueda proceder.</td>
+<td>Secretaría de Hacienda / equipo de negocio</td>
+</tr>
+</tbody>
+</table>
+<h3>Pendientes de desarrollo interno</h3>
+<p>Estos elementos sí son responsabilidad del equipo de desarrollo y se resolverán antes de cerrar esta fase:</p>
+<table>
+<thead>
+<tr>
+<th>Pendiente</th>
+<th>Responsable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Conectar el descubrimiento y clasificación automática de contribuyentes al flujo de proceso por lote (hoy disponible solo para consulta individual)</td>
+<td>Informática y Tributos S.A.S.</td>
+</tr>
+<tr>
+<td>Conectar el cruce con RUES al cálculo del puntaje de riesgo</td>
+<td>Informática y Tributos S.A.S. — La integración API ya está disponible en el Sistema Taxation Smart. Pendiente consumir el endpoint de estado mercantil desde el microservicio.</td>
+</tr>
+</tbody>
+</table>
+<h3>Pendientes para la puesta en producción</h3>
+<p>Estos elementos no dependen del equipo de desarrollo, sino de la coordinación con otras áreas:</p>
+<table>
+<thead>
+<tr>
+<th>Pendiente</th>
+<th>Responsable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Habilitación del acceso a la información fiscal real (Oracle) en el ambiente de producción</td>
+<td>Equipo del Sistema Taxation Smart / Infraestructura del municipio</td>
+</tr>
+<tr>
+<td>Aprovisionamiento del servidor donde correrá el sistema</td>
+<td>Equipo de Infraestructura</td>
+</tr>
+<tr>
+<td>Activación de las credenciales de los proveedores de IA para el ambiente productivo</td>
+<td>Definición conjunta</td>
+</tr>
+</tbody>
+</table>
+<h2>7. Próximos Pasos Propuestos</h2>
+<ol>
+<li>Validar esta propuesta con la Secretaría de Hacienda y recoger observaciones.</li>
+<li>Definir con el equipo de Hacienda qué información del contribuyente se necesita actualizar desde RUES para que el proceso de fiscalización pueda proceder, y consumir el endpoint de estado mercantil desde el microservicio.</li>
+<li>Coordinar con el equipo de infraestructura la disponibilidad del ambiente de producción y el acceso a la información fiscal real.</li>
+<li>Ejecutar una fase de pruebas piloto con un grupo controlado de contribuyentes, antes de habilitar el uso masivo.</li>
+<li>Evaluar, como una fase posterior, la generación asistida de actos formales (requerimientos, emplazamientos), que hoy queda deliberadamente fuera del alcance para asegurar primero la solidez del análisis y la explicación.</li>
+</ol>
+<hr />
+<p><em>Este documento resume, en términos no técnicos, el alcance y funcionamiento de la propuesta de desarrollo de FiscalIA. Para el detalle técnico de arquitectura, integración y seguridad, se cuenta con documentación complementaria disponible para el equipo técnico del municipio.</em></p>
+</body>
+</html>
