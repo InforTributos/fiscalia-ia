@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -67,5 +68,6 @@ async def test_ejecutar_error_mcp(mock_llm, mock_repo):
          patch("application.use_cases.orquestar_proceso.obtener_datos_fiscales") as odf:
         odf.side_effect = Exception("MCP connection error")
         orch = ProcesoOrchestrator(mock_llm, mock_repo)
-        await orch.ejecutar(proceso_id="test-id", intento_id=1, nit="9003189639", detalle_id=42, periodo="2024")
+        pid_str = str(uuid.uuid4())
+        await orch.ejecutar(proceso_id=pid_str, intento_id=1, nit="9003189639", detalle_id=42, periodo="2024")
         mock_repo.insertar_error_detalle.assert_awaited_once()

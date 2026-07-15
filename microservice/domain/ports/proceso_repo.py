@@ -52,7 +52,19 @@ class ProcesoRepo(ABC):
         ...
 
     @abstractmethod
+    async def desactivar_cliente(self, cliente_id: UUID) -> None:
+        ...
+
+    @abstractmethod
+    async def reactivar_cliente(self, cliente_id: UUID) -> None:
+        ...
+
+    @abstractmethod
     async def insertar_detalle(self, proceso_id: UUID, intento_id: int, **kwargs) -> int | None:
+        ...
+
+    @abstractmethod
+    async def bulk_insertar_detalle(self, rows: list[dict]) -> list[int]:
         ...
 
     @abstractmethod
@@ -64,7 +76,7 @@ class ProcesoRepo(ABC):
         ...
 
     @abstractmethod
-    async def insertar_error_detalle(self, detalle_id: int, nit: str, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
+    async def insertar_error_detalle(self, proceso_id: UUID, detalle_id: int, nit: str, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
         ...
 
     @abstractmethod

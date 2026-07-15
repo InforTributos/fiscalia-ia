@@ -44,14 +44,23 @@ class PostgresProcesoRepo(ProcesoRepo):
     async def insertar_detalle(self, proceso_id: UUID, intento_id: int, **kwargs) -> int | None:
         return await queries.insertar_detalle(proceso_id, intento_id, **kwargs)
 
+    async def bulk_insertar_detalle(self, rows: list[dict]) -> list[int]:
+        return await queries.bulk_insertar_detalle(rows)
+
     async def actualizar_resultado_detalle(self, id: int, **kwargs):
         return await queries.actualizar_resultado_detalle(id, **kwargs)
 
     async def insertar_error_proceso(self, proceso_id: UUID, intento_id: int, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
         return await queries.insertar_error_proceso(proceso_id, intento_id, capa, codigo, mensaje, contexto)
 
-    async def insertar_error_detalle(self, detalle_id: int, nit: str, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
-        return await queries.insertar_error_detalle(detalle_id, nit, capa, codigo, mensaje, contexto)
+    async def insertar_error_detalle(self, proceso_id: UUID, detalle_id: int, nit: str, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
+        return await queries.insertar_error_detalle(proceso_id, detalle_id, nit, capa, codigo, mensaje, contexto)
+
+    async def desactivar_cliente(self, cliente_id: UUID) -> None:
+        return await queries.desactivar_cliente(cliente_id)
+
+    async def reactivar_cliente(self, cliente_id: UUID) -> None:
+        return await queries.reactivar_cliente(cliente_id)
 
     async def listar_proceso_detalle(self, proceso_id: UUID, **filtros):
         return await queries.listar_proceso_detalle(proceso_id, **filtros)
