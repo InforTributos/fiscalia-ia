@@ -41,7 +41,7 @@ async def consultar_status(proceso_id: uuid.UUID):
 
     total = proceso.get("total_nits", 0) or 0
     candidatos = proceso.get("candidatos", 0) or 0
-    procesados = intento_actual["procesados"] if intento_actual else 0
+    procesados = (intento_actual["procesados"] or 0) if intento_actual else 0
     faltantes = candidatos - procesados if candidatos > procesados else 0
     porcentaje = round((procesados / candidatos * 100), 1) if candidatos > 0 else 0.0
 

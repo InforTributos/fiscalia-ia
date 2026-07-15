@@ -1,10 +1,14 @@
 import json
 import logging
 
+from config import settings
+
 logger = logging.getLogger(__name__)
 
+_MUNICIPIO = settings.municipio
+
 PROMPT_ANALISIS_OMISO = """
-Eres un experto en fiscalización tributaria municipal de Valledupar, Colombia.
+Eres un experto en fiscalización tributaria municipal de {municipio}, Colombia.
 Analiza el siguiente contribuyente OMISO en el pago del Impuesto de Industria y Comercio (ICA).
 
 Datos del contribuyente:
@@ -19,7 +23,7 @@ Genera un JSON con la siguiente estructura:
 """
 
 PROMPT_ANALISIS_INEXACTO = """
-Eres un experto en fiscalización tributaria municipal de Valledupar, Colombia.
+Eres un experto en fiscalización tributaria municipal de {municipio}, Colombia.
 Analiza las siguientes INCONSISTENCIAS en la declaración de ICA de un contribuyente.
 
 Datos del contribuyente:
@@ -51,7 +55,7 @@ Genera un JSON con la siguiente estructura:
 """
 
 PROMPT_SRF_EXPLICACION = """
-Eres un asistente de fiscalización del ICA en Valledupar, Colombia.
+Eres un asistente de fiscalización del ICA en {municipio}, Colombia.
 Explica en lenguaje simple por qué este contribuyente tiene un Score de Riesgo Fiscal de {srf_total}/100.
 
 Factores del SRF:
@@ -65,7 +69,7 @@ Genera un JSON con:
 """
 
 PROMPT_CLASIFICACION = """
-Eres un clasificador de contribuyentes para fiscalización del ICA en Valledupar.
+Eres un clasificador de contribuyentes para fiscalización del ICA en {municipio}, Colombia.
 Basado en los datos del MCP, clasifica el siguiente contribuyente.
 
 Datos MCP:
@@ -80,7 +84,44 @@ Genera un JSON con:
 """
 
 
+PROMPT_RESUMEN_CAMPANA = """
+Eres un experto en fiscalización tributaria municipal de {municipio}, Colombia.
+Genera un resumen ejecutivo de la campaña de fiscalización del ICA.
+
+Parámetros de la campaña:
+- Periodo: {periodo}
+- Actividad económica (CIIU): {actividad_economica}
+- Total candidatos analizados: {total_candidatos}
+- Omisos: {total_omisos}
+- Inexactos: {total_inexactos}
+
+Estadísticas de hallazgos:
+{estadisticas_hallazgos}
+
+Top 10 contribuyentes por score de riesgo:
+{top_contribuyentes}
+
+Patrones temporales detectados:
+{patrones_temporales}
+
+Genera un JSON con:
+{{
+    "resumen_ejecutivo": "string — resumen de 3-5 párrafos para el director de fiscalización",
+    "hallazgos_principales": ["string", "string", "string"],
+    "brecha_fiscal_total_estimada": float,
+    "recomendaciones": ["string", "string", "string"],
+    "distribucion_riesgo": {{
+        "critico": int,
+        "alto": int,
+        "medio": int,
+        "bajo": int
+    }}
+}}
+"""
+
+
 def construir_prompt(tipo: str, **kwargs) -> str:
+    kwargs.setdefault("municipio", _MUNICIPIO)
     if tipo == "omiso":
         return PROMPT_ANALISIS_OMISO.format(**kwargs)
     elif tipo == "inexacto":
@@ -89,6 +130,8 @@ def construir_prompt(tipo: str, **kwargs) -> str:
         return PROMPT_SRF_EXPLICACION.format(**kwargs)
     elif tipo == "clasificacion":
         return PROMPT_CLASIFICACION.format(**kwargs)
+    elif tipo == "resumen_campana":
+        return PROMPT_RESUMEN_CAMPANA.format(**kwargs)
     return json.dumps(kwargs, indent=2, ensure_ascii=False)
 
 

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 
 from domain.errors import FiscalIAError, ProcesoEnProcesoError
 from fastapi import APIRouter
@@ -11,6 +12,25 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 repo = PostgresProcesoRepo()
+
+
+async def _lanzar_analisis(proceso_id: uuid.UUID, intento_id: int, criteria: dict):
+    from tasks.concurrency import esperar_turno, liberar_slot
+
+    cancel_event = await esperar_turno(str(proceso_id))
+    try:
+        if cancel_event.is_set():
+            logger.warning("Proceso %s cancelado mientras esperaba turno", proceso_id)
+            await repo.actualizar_estado_proceso(proceso_id, "INTERRUMPIDO")
+            return
+        await analizar_proceso(str(proceso_id), intento_id, criteria)
+    except asyncio.CancelledError:
+        await repo.actualizar_estado_proceso(proceso_id, "INTERRUMPIDO")
+    except Exception as e:
+        logger.error("Error fatal en proceso %s: %s", proceso_id, e)
+        await repo.actualizar_estado_proceso(proceso_id, "ERROR")
+    finally:
+        liberar_slot(str(proceso_id))
 
 
 @router.post("/proceso", status_code=201, response_model=ProcesoResponse)
@@ -53,7 +73,7 @@ async def crear_proceso(req: ProcesoRequest):
     await repo.actualizar_estado_proceso(proceso_id, "EN_COLA")
     await repo.actualizar_estado_intento(intento_id, "EN_COLA")
 
-    asyncio.create_task(analizar_proceso(str(proceso_id), intento_id, criteria))
+    asyncio.create_task(_lanzar_analisis(proceso_id, intento_id, criteria))
 
     return ProcesoResponse(
         proceso_id=proceso_id,
@@ -68,3 +88,21 @@ async def crear_proceso(req: ProcesoRequest):
         ),
         created_at=__import__("datetime").datetime.now(),
     )
+
+
+@router.post("/proceso/{proceso_id}/cancelar")
+async def cancelar_proceso(proceso_id: str):
+    pid = uuid.UUID(proceso_id)
+    proceso = await repo.obtener_proceso(pid)
+    if not proceso:
+        raise FiscalIAError("Proceso no encontrado")
+    if proceso["estado"] not in ("EN_PROCESO", "EN_COLA", "PREFILTRANDO", "PENDIENTE"):
+        raise FiscalIAError(
+            f"El proceso esta en estado {proceso['estado']}, no se puede cancelar"
+        )
+    await repo.actualizar_estado_proceso(pid, "INTERRUMPIDO")
+
+    from tasks.concurrency import cancelar as cancelar_activo
+    cancelar_activo(proceso_id)
+
+    return {"proceso_id": proceso_id, "estado": "INTERRUMPIDO"}

@@ -12,11 +12,9 @@ class Paginacion(BaseModel):
 
 class HallazgoResult(BaseModel):
     tipo: str
-    declarado_ica: float | None = None
-    exogena: float | None = None
-    diferencia: float | None = None
-    variacion_pct: float | None = None
+    severidad: str | None = None
     explicacion_ia: str | None = None
+    detalle: dict = Field(default_factory=dict)
 
 
 class ResultadoDetalle(BaseModel):

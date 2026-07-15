@@ -44,10 +44,18 @@ async def consultar_resultados(
         if isinstance(hallazgos_raw, str):
             import json
             hallazgos_raw = json.loads(hallazgos_raw)
-        hallazgos = [
-            HallazgoResult(**h) if isinstance(h, dict) else HallazgoResult(tipo=str(h))
-            for h in hallazgos_raw
-        ]
+        hallazgos = []
+        for h in hallazgos_raw:
+            if isinstance(h, dict):
+                tipo = h.pop("tipo", "DESCONOCIDO")
+                severidad = h.pop("severidad", None)
+                explicacion_ia = h.pop("explicacion_ia", None)
+                hallazgos.append(HallazgoResult(
+                    tipo=tipo, severidad=severidad,
+                    explicacion_ia=explicacion_ia, detalle=h,
+                ))
+            else:
+                hallazgos.append(HallazgoResult(tipo=str(h)))
 
         resultados.append(ResultadoDetalle(
             nit=r["nit"],
