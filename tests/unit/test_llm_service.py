@@ -1,9 +1,14 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from infrastructure.llm.llm_service import LLMService
 
 
-def test_llm_service_sin_providers():
+@patch("infrastructure.llm.llm_service.settings")
+def test_llm_service_sin_providers(mock_settings):
+    mock_settings.llm_tier1_api_key = ""
+    mock_settings.llm_tier1_provider = ""
+    mock_settings.llm_tier2_api_key = ""
+    mock_settings.llm_tier3_api_key = ""
     service = LLMService()
     assert len(service.providers) == 0
     assert service.providers_count == 0

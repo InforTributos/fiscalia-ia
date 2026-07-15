@@ -6,7 +6,6 @@ from infrastructure.llm.anthropic_provider import AnthropicProvider
 from infrastructure.llm.huggingface_provider import HuggingFaceProvider
 from infrastructure.llm.nvidia_nim_provider import NvidiaNIMProvider
 from infrastructure.llm.openai_provider import OpenAIProvider
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -29,14 +28,18 @@ class LLMService:
         if settings.llm_tier3_api_key:
             self.providers.append(HuggingFaceProvider())
 
+    async def async_init(self):
+        for p in self.providers:
+            if hasattr(p, "_ensure_model"):
+                try:
+                    await p._ensure_model()
+                    logger.info("LLM: %s listo (modelo: %s)", type(p).__name__, p.model)
+                except Exception as e:
+                    logger.warning("LLM: %s fallo en validacion inicial: %s", type(p).__name__, e)
+
         if not self.providers:
             logger.warning("No hay providers LLM configurados — modo degradado permanente")
 
-    @retry(
-        stop=stop_after_attempt(2),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((TimeoutError, ConnectionError)),
-    )
     async def _call_provider(self, provider: LLMProvider, messages: list[dict], schema: dict | None) -> dict:
         return await provider.chat_json(messages, schema)
 

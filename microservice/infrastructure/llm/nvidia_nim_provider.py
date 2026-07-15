@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -8,15 +9,89 @@ from openai import AsyncOpenAI
 logger = logging.getLogger(__name__)
 
 
+def _safe_int(obj, *attrs):
+    try:
+        val = obj
+        for a in attrs:
+            val = getattr(val, a)
+        if not isinstance(val, (int, float)):
+            return 0
+        return int(val)
+    except (AttributeError, TypeError, ValueError):
+        return 0
+
+
+AVAILABLE_MODELS: list[str] | None = None
+SELECTED_MODEL: str | None = None
+
+PREFERRED_MODELS = [
+    "meta/llama-3.1-8b-instruct",
+    "mistralai/mixtral-8x7b-instruct-v0.1",
+    "qwen/qwen3.5-122b-a10b",
+    "mistralai/mistral-7b-instruct-v0.3",
+    "google/gemma-3-12b-it",
+    "mistralai/mistral-large",
+    "meta/llama-3.3-70b-instruct",
+]
+
+
+async def _verify_model(client: AsyncOpenAI, model: str) -> bool:
+    try:
+        await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "test"}],
+            max_tokens=1,
+            timeout=10,
+        )
+        return True
+    except Exception:
+        return False
+
+
+async def _auto_select_model() -> str:
+    global SELECTED_MODEL
+    if SELECTED_MODEL is not None:
+        return SELECTED_MODEL
+
+    client = AsyncOpenAI(
+        api_key=settings.llm_tier2_api_key,
+        base_url=settings.llm_tier2_api_base or "https://integrate.api.nvidia.com/v1",
+    )
+
+    configured = settings.llm_tier2_model
+    if await _verify_model(client, configured):
+        logger.info("NVIDIA: modelo configurado %s funciona", configured)
+        SELECTED_MODEL = configured
+        return configured
+
+    logger.warning("NVIDIA: modelo %s NO disponible, buscando alternativas...", configured)
+    for model in PREFERRED_MODELS:
+        if await _verify_model(client, model):
+            logger.info("NVIDIA: seleccionado automaticamente: %s", model)
+            SELECTED_MODEL = model
+            return model
+
+    logger.warning("NVIDIA: ningun modelo preferido funciona, usando configurado: %s", configured)
+    SELECTED_MODEL = configured
+    return configured
+
+
 class NvidiaNIMProvider(LLMProvider):
     def __init__(self):
         self.client = AsyncOpenAI(
             api_key=settings.llm_tier2_api_key,
             base_url=settings.llm_tier2_api_base or "https://integrate.api.nvidia.com/v1",
         )
+        self._model_resolved = False
         self.model = settings.llm_tier2_model
 
+    async def _ensure_model(self):
+        if not self._model_resolved:
+            self.model = await _auto_select_model()
+            self._model_resolved = True
+
     async def chat(self, messages: list[dict], **kwargs) -> LLMResponse:
+        await self._ensure_model()
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -34,19 +109,29 @@ class NvidiaNIMProvider(LLMProvider):
         )
 
     async def chat_json(self, messages: list[dict], schema: dict | None = None) -> dict:
+        await self._ensure_model()
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,
             max_tokens=settings.llm_max_tokens,
             temperature=0.1,
-            timeout=settings.llm_timeout,
+            timeout=settings.llm_timeout or None,
         )
 
         text = response.choices[0].message.content or "{}"
+        tokens_in = _safe_int(response, 'usage', 'prompt_tokens')
+        tokens_out = _safe_int(response, 'usage', 'completion_tokens')
         try:
             inicio = text.index("{")
-            fin = text.rindex("}") + 1
-            return json.loads(text[inicio:fin])
+            decoder = json.JSONDecoder()
+            data, _ = decoder.raw_decode(text, inicio)
+            if isinstance(data, list):
+                data = data[0] if data else {}
+            result = data if isinstance(data, dict) else {"explicacion": str(data)}
+            result.setdefault("tokens_entrada", tokens_in)
+            result.setdefault("tokens_salida", tokens_out)
+            return result
         except (ValueError, json.JSONDecodeError) as e:
             logger.warning("Error parseando respuesta Nvidia NIM: %s", str(e))
-            return {"explicacion": text, "hallazgos_enriquecidos": []}
+            return {"explicacion": text, "hallazgos_enriquecidos": [],
+                    "tokens_entrada": tokens_in, "tokens_salida": tokens_out}

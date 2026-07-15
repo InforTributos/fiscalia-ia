@@ -8,6 +8,7 @@ class LLMResponse:
     tokens_entrada: int = 0
     tokens_salida: int = 0
     provider: str = ""
+    modelo: str = ""
 
 
 class LLMProvider(ABC):

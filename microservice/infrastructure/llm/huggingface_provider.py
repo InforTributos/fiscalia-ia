@@ -8,6 +8,18 @@ from openai import AsyncOpenAI
 logger = logging.getLogger(__name__)
 
 
+def _safe_int(obj, *attrs):
+    try:
+        val = obj
+        for a in attrs:
+            val = getattr(val, a)
+        if not isinstance(val, (int, float)):
+            return 0
+        return int(val)
+    except (AttributeError, TypeError, ValueError):
+        return 0
+
+
 class HuggingFaceProvider(LLMProvider):
     def __init__(self):
         self.client = AsyncOpenAI(
@@ -39,14 +51,23 @@ class HuggingFaceProvider(LLMProvider):
             messages=messages,
             max_tokens=settings.llm_max_tokens,
             temperature=0.1,
-            timeout=settings.llm_timeout,
+            timeout=settings.llm_timeout or None,
         )
 
         text = response.choices[0].message.content or "{}"
+        tokens_in = _safe_int(response, 'usage', 'prompt_tokens')
+        tokens_out = _safe_int(response, 'usage', 'completion_tokens')
         try:
             inicio = text.index("{")
-            fin = text.rindex("}") + 1
-            return json.loads(text[inicio:fin])
+            decoder = json.JSONDecoder()
+            data, _ = decoder.raw_decode(text, inicio)
+            if isinstance(data, list):
+                data = data[0] if data else {}
+            result = data if isinstance(data, dict) else {"explicacion": str(data)}
+            result.setdefault("tokens_entrada", tokens_in)
+            result.setdefault("tokens_salida", tokens_out)
+            return result
         except (ValueError, json.JSONDecodeError) as e:
             logger.warning("Error parseando respuesta HuggingFace: %s", str(e))
-            return {"explicacion": text, "hallazgos_enriquecidos": []}
+            return {"explicacion": text, "hallazgos_enriquecidos": [],
+                    "tokens_entrada": tokens_in, "tokens_salida": tokens_out}
