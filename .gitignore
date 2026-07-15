@@ -53,3 +53,19 @@ reports/
 
 # Node.js
 node_modules/
+
+# Debug / temp outputs
+benchmark_results.csv
+err.txt
+pag_fail.txt
+tb.txt
+monitor_proceso.py
+
+# One-off tools
+microservice/auditor.py
+
+# Claude Desktop
+.claude/
+
+# Playwright MCP
+.playwright-mcp/
