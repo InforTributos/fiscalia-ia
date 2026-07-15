@@ -37,15 +37,31 @@ Hexagonal (Ports & Adapters) + DDD. Capas:
 - `tasks/` — `analisis_task.py` (background), `retry.py` (tenacity).
 - `cache/` — `response_cache.py` (in-memory TTL).
 
+## Reading Order
+
+Antes de cualquier cambio, leer en este orden:
+
+1. **AGENTS.md** (este archivo) — fuente de verdad: arquitectura, convenciones, errores, gotchas
+2. **MEMORY/TODO.md** — trabajo pendiente, tech debt, tareas en progreso
+3. Según el área de trabajo:
+   - **LLM**: `docs/06-llm-configuracion.md`
+   - **Modelo de datos**: `docs/02-modelo-datos.md`
+   - **MCP/Oracle**: `docs/03-contrato-mcp.md`
+   - **Big picture**: `docs/01-arquitectura.md`
+
 ## Key Conventions
 
 - **Config**: `config.py` uses `pydantic-settings` reading `.env`. Startup validates no `changeme` placeholders in API keys or DB password.
 - **Errors**: Never raise `HTTPException` in routers. Raise `FiscalIAError` subtypes — `error_handler.py` maps them to HTTP responses.
-- **Tests**: AAA (Arrange-Act-Assert). Repos are **mocked via fixtures** (`mock_repo`), not patched via `@patch("queries.*")`. The `conftest.py` adds `microservice/` to `sys.path`.
+- **Tests**: AAA (Arrange-Act-Assert). Repos are **mocked via fixtures** (`mock_repo`), not patched via `@patch("queries.*")`. The `conftest.py` adds `microservice/` to `sys.path`. Tests que requieren deps externas usan `@pytest.mark.integration`.
+- **Type hints**: Obligatorios en funciones públicas.
+- **Docstrings**: Solo módulos + clases públicas. Funciones puras no requieren docstring.
+- **Imports**: stdlib → third-party → local, alfabético.
 - **Linting**: ruff, line-length 120, double quotes. Rules: `E, F, I, N, W, UP`.
 - **Pool**: asyncpg pool lifecycle managed by FastAPI lifespan in `main.py`. Configurable via `POOL_MIN_SIZE`, `POOL_MAX_SIZE`, `POOL_TIMEOUT` env vars.
 - **Routers import repos at module level**: `repo = PostgresProcesoRepo()` — not via DI framework.
 - **Config env vars**: `LLM_TIER1_*`, `LLM_TIER2_*`, `LLM_TIER3_*`, `POSTGRES_*`. `.env.example` is the source of truth for naming.
+- **Tiers LLM**: Tier 1 (pagado, Anthropic/OpenAI), Tier 2 (gratuito, NVIDIA NIM), Tier 3 (gratuito, HuggingFace). Ver `docs/06-llm-configuracion.md`.
 - **`orquestar_proceso.py`** recibe `periodo` desde `criteria` — ya no está hardcodeado.
 
 ## Gotchas
@@ -115,8 +131,6 @@ Post-discovery classification: no ICA declarations → **OMISO**, anomalies → 
 ## Docs
 
 Start with `docs/01-arquitectura.md` for the big picture. `docs/09-plan-desarrollo.md` has the roadmap and current status (192 tests, 72% coverage).
-
-## Gotchas (continued)
 
 ## Project Memory
 
