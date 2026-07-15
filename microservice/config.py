@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_host: str = "0.0.0.0"
 
+    municipio: str = "Valledupar"
+    departamento: str = "Cesar"
+
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "fiscalia"
@@ -29,16 +32,19 @@ class Settings(BaseSettings):
     llm_tier3_api_base: str = "https://api-inference.huggingface.co/v1"
 
     llm_max_tokens: int = 4096
-    llm_timeout: int = 60
+    llm_timeout: int = 0
 
     cache_ttl_seconds: int = 3600
 
-    retry_max_attempts: int = 3
+    retry_max_attempts: int = 1
     retry_backoff_factor: int = 2
-    retry_timeout: int = 60
+    retry_timeout: int = 0
 
     max_concurrent_processes: int = 5
-    process_timeout_minutes: int = 30
+    process_timeout_minutes: int = 0
+
+    nit_concurrency: int = 5
+    batch_db_size: int = 50
 
     pool_min_size: int = 4
     pool_max_size: int = 20
@@ -54,6 +60,9 @@ class Settings(BaseSettings):
     oracle_pool_min: int = 2
     oracle_pool_max: int = 5
     oracle_pool_timeout: int = 30
+
+    campana_page_size: int = 100
+    campana_max_candidatos: int = 10000
 
     startup_time: float = time.time()
 

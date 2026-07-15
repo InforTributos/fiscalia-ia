@@ -7,7 +7,7 @@ PESO_OMISION = 20
 PESO_TARIFA = 25
 PESO_RUES = 20
 
-TARIFAS_CIIU = {
+TARIFAS_CIIU_DEFAULT = {
     "4711": 0.008,
     "4712": 0.008,
     "4721": 0.006,
@@ -17,6 +17,13 @@ TARIFAS_CIIU = {
     "6201": 0.003,
     "6202": 0.003,
 }
+
+_tarifas_ciiu: dict[str, float] = dict(TARIFAS_CIIU_DEFAULT)
+
+
+def configurar_tarifas(tarifas: dict[str, float]):
+    _tarifas_ciiu.clear()
+    _tarifas_ciiu.update(tarifas)
 
 
 def clasificar_por_datos(datos: dict) -> str:
@@ -72,7 +79,7 @@ def extraer_inconsistencias(datos: dict) -> list[dict]:
             inconsistencias.append({"tipo": "BASE_CERO", "periodo": dec.get("periodo"), "severidad": "MEDIA"})
 
         ciiu = datos.get("ciiu", "")
-        tarifa_oficial = TARIFAS_CIIU.get(ciiu)
+        tarifa_oficial = _tarifas_ciiu.get(ciiu)
         tarifa_declarada = dec.get("tarifa", 0) or 0
         if tarifa_oficial and tarifa_declarada > 0 and abs(tarifa_declarada - tarifa_oficial) > 0.001:
             inconsistencias.append({
@@ -124,7 +131,7 @@ def calcular_srf(datos: dict) -> dict:
     score += comp_omision
 
     ciiu = datos.get("ciiu", "")
-    tarifa_oficial = TARIFAS_CIIU.get(ciiu)
+    tarifa_oficial = _tarifas_ciiu.get(ciiu)
     if tarifa_oficial and declaraciones:
         discrepancias = []
         for dec in declaraciones:

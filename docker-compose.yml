@@ -7,4 +7,12 @@ services:
       - "${API_PORT:-8000}:8000"
     env_file:
       - .env
+    environment:
+      - POSTGRES_HOST=postgresql-db
     restart: unless-stopped
+    networks:
+      - db_default
+
+networks:
+  db_default:
+    external: true

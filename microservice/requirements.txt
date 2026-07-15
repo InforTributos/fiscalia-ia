@@ -9,6 +9,7 @@ pydantic-settings>=2.0.0
 tenacity>=9.0.0
 python-dotenv>=1.0.0
 oracledb>=4.0.0
+openpyxl>=3.1.0
 
 # Dev/test
 pytest>=8.0.0
