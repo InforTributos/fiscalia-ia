@@ -63,6 +63,7 @@ monitor_proceso.py
 
 # One-off tools
 microservice/auditor.py
+microservice/benchmark.py
 
 # Claude Desktop
 .claude/
