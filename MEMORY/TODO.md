@@ -11,6 +11,14 @@ tags: [todo, backlog, tech-debt]
 
 ## Pendientes inmediatos
 
+### ✅ Tests de todos los use cases (RESUELTO)
+
+| Campo | Valor |
+|---|---|
+| **Archivo** | `tests/unit/test_use_cases.py` |
+| **Fix** | 51 tests cubriendo los 7 use cases: `AnalizarComportamientoUseCase` (9), `AnalizarGrafoRiesgoUseCase` (4), `AplicarReglasFiscalesUseCase` (5), `construir_perfil_fiscal_desde_datos_originales` (8), `GenerarExpedienteFiscalUseCase` (2), `GestionarHallazgosUseCase` (14), `RevisarHallazgoAgenteUseCase` (5), `_compactar_hallazgo` (4). Mocking via `AsyncMock` + `@patch` en repos, queries, LLM. Errores cubiertos: `NITNoEncontradoError`, `ProcesoNoEncontradoError`, `HallazgoNoEncontradoError`, `SolicitudInvalidaError`. |
+| **Resuelto** | 2026-07-14 |
+
 ### ✅ POST /proceso ya ejecuta descubrimiento y clasificación (RESUELTO)
 
 | Campo | Valor |

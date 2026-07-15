@@ -69,6 +69,11 @@
       "type": "local",
       "command": ["node", "scripts/run-oracle-mcp.js"],
       "enabled": true
+    },
+    "postgres": {
+      "type": "local",
+      "command": ["npx", "-y", "@ahmetkca/mcp-server-postgres@1.2.0", "postgresql://admin:A@localhost:5432/fiscalia"],
+      "enabled": true
     }
   }
 }
