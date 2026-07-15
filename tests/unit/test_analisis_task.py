@@ -56,22 +56,19 @@ async def _passthrough(fn, *args, **kwargs):
 @patch("tasks.analisis_task.obtener_inexactos_ciiu")
 @patch("tasks.analisis_task.obtener_omisos_desconocidos")
 @patch("tasks.analisis_task.obtener_omisos_conocidos")
-@patch("tasks.analisis_task.RepositorioLookupOracle")
 @patch("tasks.analisis_task.OracleClient")
-@patch("tasks.analisis_task.with_retry", new_callable=AsyncMock)
 @patch("tasks.analisis_task.LLMService")
 @patch("tasks.analisis_task.PostgresProcesoRepo")
 @patch("tasks.analisis_task.ProcesoOrchestrator")
 async def test_analizar_proceso_happy_path(
-    mock_orch_cls, mock_repo_cls, mock_llm_cls, mock_retry,
-    mock_oc, mock_lookup_cls,
+    mock_orch_cls, mock_repo_cls, mock_llm_cls,
+    mock_oc,
     mock_omisos_con, mock_omisos_desc, mock_inex_ciiu, mock_inex_ret,
     mock_repo, mock_orch,
 ):
     mock_repo_cls.return_value = mock_repo
     mock_orch_cls.return_value = mock_orch
     mock_llm_cls.return_value = MagicMock()
-    mock_retry.side_effect = _passthrough
     _config_oracle(mock_oc)
 
     mock_omisos_con.return_value = _agen([
@@ -89,13 +86,14 @@ async def test_analizar_proceso_happy_path(
         {"id": 2, "nit": "9003189640", "clasificacion": "OMISO"},
         {"id": 3, "nit": "9003189641", "clasificacion": "INEXACTO"},
     ])
-    mock_repo.insertar_detalle.return_value = 1
+    mock_repo.bulk_insertar_detalle = AsyncMock(return_value=[1, 2, 3])
 
     await analizar_proceso(VALID_UUID, 1, CRITERIA)
 
-    assert mock_repo.insertar_detalle.call_count == 3
-    calls = [c[1] for c in mock_repo.insertar_detalle.call_args_list]
-    nits = [c["nit"] for c in calls]
+    mock_repo.bulk_insertar_detalle.assert_awaited_once()
+    bulk_calls = mock_repo.bulk_insertar_detalle.call_args[0][0]
+    assert len(bulk_calls) == 3
+    nits = [c["nit"] for c in bulk_calls]
     assert "9003189639" in nits
     assert "9003189640" in nits
     assert "9003189641" in nits
@@ -114,22 +112,19 @@ async def test_analizar_proceso_happy_path(
 @patch("tasks.analisis_task.obtener_inexactos_ciiu")
 @patch("tasks.analisis_task.obtener_omisos_desconocidos")
 @patch("tasks.analisis_task.obtener_omisos_conocidos")
-@patch("tasks.analisis_task.RepositorioLookupOracle")
 @patch("tasks.analisis_task.OracleClient")
-@patch("tasks.analisis_task.with_retry", new_callable=AsyncMock)
 @patch("tasks.analisis_task.LLMService")
 @patch("tasks.analisis_task.PostgresProcesoRepo")
 @patch("tasks.analisis_task.ProcesoOrchestrator")
 async def test_analizar_proceso_con_error_por_nit(
-    mock_orch_cls, mock_repo_cls, mock_llm_cls, mock_retry,
-    mock_oc, mock_lookup_cls,
+    mock_orch_cls, mock_repo_cls, mock_llm_cls,
+    mock_oc,
     mock_omisos_con, mock_omisos_desc, mock_inex_ciiu, mock_inex_ret,
     mock_repo, mock_orch,
 ):
     mock_repo_cls.return_value = mock_repo
     mock_orch_cls.return_value = mock_orch
     mock_llm_cls.return_value = MagicMock()
-    mock_retry.side_effect = _passthrough
     _config_oracle(mock_oc)
 
     mock_omisos_con.return_value = _agen([
@@ -138,7 +133,7 @@ async def test_analizar_proceso_con_error_por_nit(
     mock_omisos_desc.return_value = _empty_agen()
     mock_inex_ciiu.return_value = _empty_agen()
     mock_inex_ret.return_value = _empty_agen()
-    mock_repo.insertar_detalle.return_value = 1
+    mock_repo.bulk_insertar_detalle = AsyncMock(return_value=[1])
 
     mock_orch.ejecutar.side_effect = Exception("LLM timeout")
 
@@ -157,15 +152,13 @@ async def test_analizar_proceso_con_error_por_nit(
 @patch("tasks.analisis_task.obtener_inexactos_ciiu")
 @patch("tasks.analisis_task.obtener_omisos_desconocidos")
 @patch("tasks.analisis_task.obtener_omisos_conocidos")
-@patch("tasks.analisis_task.RepositorioLookupOracle")
 @patch("tasks.analisis_task.OracleClient")
-@patch("tasks.analisis_task.with_retry", new_callable=AsyncMock)
 @patch("tasks.analisis_task.LLMService")
 @patch("tasks.analisis_task.PostgresProcesoRepo")
 @patch("tasks.analisis_task.ProcesoOrchestrator")
 async def test_analizar_proceso_sin_candidatos(
-    mock_orch_cls, mock_repo_cls, mock_llm_cls, mock_retry,
-    mock_oc, mock_lookup_cls,
+    mock_orch_cls, mock_repo_cls, mock_llm_cls,
+    mock_oc,
     mock_omisos_con, mock_omisos_desc, mock_inex_ciiu, mock_inex_ret,
     mock_repo, mock_orch,
 ):
@@ -182,7 +175,7 @@ async def test_analizar_proceso_sin_candidatos(
     await analizar_proceso(VALID_UUID, 1, CRITERIA)
 
     assert mock_orch.ejecutar.call_count == 0
-    assert mock_repo.insertar_detalle.call_count == 0
+    mock_repo.bulk_insertar_detalle.assert_not_called()
     mock_repo.actualizar_estado_proceso.assert_any_call(uuid.UUID(VALID_UUID), "COMPLETADO")
     mock_repo.actualizar_estado_intento.assert_called_with(1, "COMPLETADO")
 
@@ -192,15 +185,13 @@ async def test_analizar_proceso_sin_candidatos(
 @patch("tasks.analisis_task.obtener_inexactos_ciiu")
 @patch("tasks.analisis_task.obtener_omisos_desconocidos")
 @patch("tasks.analisis_task.obtener_omisos_conocidos")
-@patch("tasks.analisis_task.RepositorioLookupOracle")
 @patch("tasks.analisis_task.OracleClient")
-@patch("tasks.analisis_task.with_retry", new_callable=AsyncMock)
 @patch("tasks.analisis_task.LLMService")
 @patch("tasks.analisis_task.PostgresProcesoRepo")
 @patch("tasks.analisis_task.ProcesoOrchestrator")
 async def test_analizar_proceso_fallan_todos_generadores(
-    mock_orch_cls, mock_repo_cls, mock_llm_cls, mock_retry,
-    mock_oc, mock_lookup_cls,
+    mock_orch_cls, mock_repo_cls, mock_llm_cls,
+    mock_oc,
     mock_omisos_con, mock_omisos_desc, mock_inex_ciiu, mock_inex_ret,
     mock_repo, mock_orch,
 ):
@@ -227,22 +218,19 @@ async def test_analizar_proceso_fallan_todos_generadores(
 @patch("tasks.analisis_task.obtener_inexactos_ciiu")
 @patch("tasks.analisis_task.obtener_omisos_desconocidos")
 @patch("tasks.analisis_task.obtener_omisos_conocidos")
-@patch("tasks.analisis_task.RepositorioLookupOracle")
 @patch("tasks.analisis_task.OracleClient")
-@patch("tasks.analisis_task.with_retry", new_callable=AsyncMock)
 @patch("tasks.analisis_task.LLMService")
 @patch("tasks.analisis_task.PostgresProcesoRepo")
 @patch("tasks.analisis_task.ProcesoOrchestrator")
 async def test_analizar_proceso_ignora_nits_exactos(
-    mock_orch_cls, mock_repo_cls, mock_llm_cls, mock_retry,
-    mock_oc, mock_lookup_cls,
+    mock_orch_cls, mock_repo_cls, mock_llm_cls,
+    mock_oc,
     mock_omisos_con, mock_omisos_desc, mock_inex_ciiu, mock_inex_ret,
     mock_repo, mock_orch,
 ):
     mock_repo_cls.return_value = mock_repo
     mock_orch_cls.return_value = mock_orch
     mock_llm_cls.return_value = MagicMock()
-    mock_retry.side_effect = _passthrough
     _config_oracle(mock_oc)
 
     mock_omisos_con.return_value = _agen([
@@ -251,7 +239,7 @@ async def test_analizar_proceso_ignora_nits_exactos(
     mock_omisos_desc.return_value = _empty_agen()
     mock_inex_ciiu.return_value = _empty_agen()
     mock_inex_ret.return_value = _empty_agen()
-    mock_repo.insertar_detalle.return_value = 1
+    mock_repo.bulk_insertar_detalle = AsyncMock(return_value=[1])
 
     mock_repo.listar_proceso_detalle.return_value = (3, [
         {"id": 1, "nit": "9003189639", "clasificacion": "EXACTO"},
