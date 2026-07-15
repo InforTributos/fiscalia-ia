@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "oracle-db": {
+      "command": "node",
+      "args": ["scripts/run-oracle-mcp.js"]
+    }
+  }
+}
