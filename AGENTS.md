@@ -140,10 +140,12 @@ Open `MEMORY/` as an **Obsidian vault** for graph view, tag filtering, and full-
 
 - **MEMORY/INDEX.md** — Entry point for project memory (decisions, context, gotchas)
 - **MEMORY/TODO.md** — Tech debt and pending tasks. **Agents update this after each task.**
+- **MEMORY/CONTEXT.md** — Current session state and active work context
 - **MEMORY/DECISIONS.md** — Architectural decisions with rationale and alternatives
 - **MEMORY/GOTCHAS.md** — Lessons learned and non-obvious behaviors
 
-Check `MEMORY/TODO.md` before starting new work. Update `MEMORY/TODO.md` when completing or discovering tasks.
+**Before starting new work**: read `MEMORY/TODO.md` and `MEMORY/CONTEXT.md`.
+**After completing work**: update `MEMORY/TODO.md` with progress, add entries to `MEMORY/DECISIONS.md` or `MEMORY/GOTCHAS.md` as relevant.
 
 ## AI-DLC
 
@@ -151,3 +153,4 @@ Project uses AI-DLC Hat-Based methodology. Domain knowledge, quality gates, and 
 - `config.yml` — project metadata, 6 units (U-01…U-06), quality gates
 - `knowledge/domain.md` — ICA domain, agents (AGT-00…AGT-05), SRF, MCP contract
 - `rules/project.md` — commit format (`{hat}: {unit} - {msg}`), code style, testing mandates
+- `hats/` — role-specific prompts (builder, implementer, planner, reviewer, test-writer)
