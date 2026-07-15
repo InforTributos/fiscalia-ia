@@ -71,6 +71,7 @@ CREATE TABLE proceso_errores (
 CREATE TABLE proceso_detalle_errores (
     id SERIAL PRIMARY KEY,
     detalle_id INTEGER REFERENCES proceso_detalle(id),
+    proceso_id UUID NOT NULL REFERENCES procesos(id),
     nit VARCHAR(20) NOT NULL,
     capa VARCHAR(30) NOT NULL,
     codigo VARCHAR(50) NOT NULL,
@@ -91,4 +92,4 @@ CREATE INDEX idx_proceso_errores_proceso ON proceso_errores(proceso_id);
 CREATE INDEX idx_proceso_errores_intento ON proceso_errores(intento_id);
 CREATE INDEX idx_proceso_errores_capa ON proceso_errores(capa);
 CREATE INDEX idx_detalle_errores_detalle ON proceso_detalle_errores(detalle_id);
-CREATE INDEX idx_clientes_nit ON clientes(nit);
+CREATE INDEX idx_detalle_errores_proceso ON proceso_detalle_errores(proceso_id);
