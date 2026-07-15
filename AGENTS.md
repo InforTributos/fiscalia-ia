@@ -147,6 +147,53 @@ Open `MEMORY/` as an **Obsidian vault** for graph view, tag filtering, and full-
 **Before starting new work**: read `MEMORY/TODO.md` and `MEMORY/CONTEXT.md`.
 **After completing work**: update `MEMORY/TODO.md` with progress, add entries to `MEMORY/DECISIONS.md` or `MEMORY/GOTCHAS.md` as relevant.
 
+## Engram Persistent Memory
+
+Engram provides cross-session persistent memory. Agents MUST use it proactively — never wait to be asked.
+
+### When to save (mem_save)
+
+Call `mem_save` immediately after:
+- Completing a bug fix
+- Making an architecture or design decision
+- Discovering non-obvious behavior about the codebase
+- Changing configuration or environment setup
+- Establishing a pattern (naming, structure, convention)
+
+Format: `**What**` / `**Why**` / `**Where**` / `**Learned**` structured content. Use `topic_key` for evolving decisions to update a single observation over time.
+
+### When to search (mem_search, mem_context)
+
+- At session start: call `mem_context` to recover recent session history
+- Before working on something that might have been done before: `mem_search` with relevant keywords
+- On first user message referencing the project: search for prior work
+
+### Session close (mem_session_summary)
+
+MANDATORY before ending a session. Structure:
+
+## Goal
+[One sentence — what we were building]
+
+## Instructions
+[User preferences or constraints discovered — skip if none]
+
+## Discoveries
+- [Technical findings, gotchas, non-obvious learnings]
+
+## Accomplished
+- [Completed items with key details]
+
+## Next Steps
+- [What remains for the next session]
+
+## Relevant Files
+- path/to/file — role or what changed
+
+### After compaction
+
+If context is reset: call `mem_session_summary` FIRST to persist what was done, then `mem_context` to recover. Never skip this — without it, everything done before compaction is lost.
+
 ## AI-DLC
 
 Project uses AI-DLC Hat-Based methodology. Domain knowledge, quality gates, and detailed rules live in `.ai-dlc/`:
