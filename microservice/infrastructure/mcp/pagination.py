@@ -1,11 +1,26 @@
 import logging
 
-from domain.ports.lookup_repository import LookupRepository
 from infrastructure.mcp.oracle_adapter import OracleClient
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_PAGE_SIZE = 100
+
+# ID numérico del impuesto ICA en DF_C_IMPUESTOS
+ID_IMPSTO_ICA = 102
+
+# ID_PRGRMA en FI_D_PROGRAMAS para "OMISOS" (CDGO_PRGRMA='O') e "INEXACTOS" (CDGO_PRGRMA='I')
+ID_PRGRMA_OMISOS = 2
+ID_PRGRMA_INEXACTOS = 22
+
+# ID_FRMLRIO_RGION_ATRBTO de los atributos CÓDIGO CIIU en el FUN (formularios V2020, V2025)
+CIIU_IDS = "5125, 4971"
+# ID_FRMLRIO_RGION_ATRBTO de TARIFA (por mil) en el FUN (V2020, V2024, V2025)
+TARIFA_IDS = "2107, 4371, 4874"
+# ID_FRMLRIO_RGION_ATRBTO de RETENCIONES recibidas en el FUN
+RET_RECIBIDAS_IDS = "2135, 4416, 4919"
+# ID_FRMLRIO_RGION_ATRBTO de AUTORRETENCIONES practicadas en el FUN
+RET_PRACTICADAS_IDS = "2136, 4417, 4920"
 
 PAGINAR_CONTRIBUYENTES_SQL = """
 SELECT c.nit, c.razon_social, c.ciiu, c.regimen
@@ -177,7 +192,7 @@ WHERE d.vigencia = :vigencia
     JOIN FI_G_CANDIDATOS_VIGENCIA cv ON c.id_cnddto = cv.id_cnddto
     WHERE c.id_sjto_impsto IN (
       SELECT si2.id_sjto_impsto FROM SI_I_SUJETOS_IMPUESTO si2
-      JOIN SI_C_SUJETOS s2 ON si2.id_sjto_impsto = s2.id_sjto_impsto
+      JOIN SI_C_SUJETOS s2 ON si2.id_sjto = s2.id_sjto
       WHERE s2.idntfccion = d.nit
     )
     AND c.id_prgrma = :id_prgrma_omisos
@@ -272,20 +287,16 @@ OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 """
 
 
-async def obtener_omisos_conocidos(client: OracleClient, lookup: LookupRepository, vigencia, periodo, page_size=None):
-    id_impsto_ica = await lookup.get_impuesto_id("ICA")
-    id_prgrma_omisos = await lookup.get_programa_id("O")
-    config = await lookup.get_configuracion_declaracion()
-    payment_filter = "" if config.ind_prsntcion_dclrcion == "A" else "AND d.vlor_pago > 0"
-    sql = OMISOS_CONOCIDOS_SQL.format(payment_filter=payment_filter)
+async def obtener_omisos_conocidos(client: OracleClient, vigencia, periodo, page_size=None):
+    sql = OMISOS_CONOCIDOS_SQL.format(payment_filter="")
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
 
     while True:
         params = {
-            "id_impsto_ica": id_impsto_ica,
-            "id_prgrma_omisos": id_prgrma_omisos,
+            "id_impsto_ica": ID_IMPSTO_ICA,
+            "id_prgrma_omisos": ID_PRGRMA_OMISOS,
             "vigencia": vigencia,
             "fin_periodo": f"{vigencia}-12-31",
             "offset": offset_val,
@@ -307,15 +318,14 @@ async def obtener_omisos_conocidos(client: OracleClient, lookup: LookupRepositor
     logger.info("Omisos conocidos: %d candidatos obtenidos", total)
 
 
-async def obtener_omisos_desconocidos(client: OracleClient, lookup: LookupRepository, vigencia, page_size=None):
-    id_prgrma_omisos = await lookup.get_programa_id("OD")
+async def obtener_omisos_desconocidos(client: OracleClient, vigencia, page_size=None):
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
 
     while True:
         params = {
-            "id_prgrma_omisos": id_prgrma_omisos,
+            "id_prgrma_omisos": ID_PRGRMA_OMISOS,
             "vigencia": vigencia,
             "offset": offset_val,
             "limit": size,
@@ -336,25 +346,16 @@ async def obtener_omisos_desconocidos(client: OracleClient, lookup: LookupReposi
     logger.info("Omisos desconocidos: %d candidatos obtenidos", total)
 
 
-async def obtener_inexactos_ciiu(client: OracleClient, lookup: LookupRepository, periodo, page_size=None):
-    atributos = await lookup.get_atributos_ica(periodo)
-    id_prgrma_inexactos = await lookup.get_programa_id("I")
-    config = await lookup.get_configuracion_declaracion()
-    payment_filter = "" if config.ind_prsntcion_dclrcion == "A" else "AND decl.vlor_pago > 0"
+async def obtener_inexactos_ciiu(client: OracleClient, periodo, page_size=None):
+    sql = INEXACTOS_CIIU_SQL.format(ciiu_ids=CIIU_IDS, tarifa_ids=TARIFA_IDS, payment_filter="")
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
     vigencia = periodo
 
-    ciiu_ids_sql = ", ".join(str(a) for a in atributos.ciiu_ids)
-    tarifa_ids_sql = ", ".join(str(a) for a in atributos.tarifa_ids)
-    sql = INEXACTOS_CIIU_SQL.format(
-        ciiu_ids=ciiu_ids_sql, tarifa_ids=tarifa_ids_sql, payment_filter=payment_filter,
-    )
-
     while True:
         params = {
-            "id_prgrma_inexactos": id_prgrma_inexactos,
+            "id_prgrma_inexactos": ID_PRGRMA_INEXACTOS,
             "vigencia": vigencia,
             "offset": offset_val,
             "limit": size,
@@ -376,29 +377,21 @@ async def obtener_inexactos_ciiu(client: OracleClient, lookup: LookupRepository,
 
 
 async def obtener_inexactos_retenciones(
-    client: OracleClient, lookup: LookupRepository, periodo, page_size=None, umbral_pct=None,
+    client: OracleClient, periodo, page_size=None, umbral_pct=None,
 ):
-    atributos = await lookup.get_atributos_ica(periodo)
-    id_prgrma_inexactos = await lookup.get_programa_id("I")
-    config = await lookup.get_configuracion_declaracion()
-    payment_filter = "" if config.ind_prsntcion_dclrcion == "A" else "AND decl.vlor_pago > 0"
+    sql = INEXACTOS_RETENCIONES_SQL.format(
+        ret_recibidas_ids=RET_RECIBIDAS_IDS,
+        ret_practicadas_ids=RET_PRACTICADAS_IDS,
+        payment_filter="",
+    )
     size = page_size or DEFAULT_PAGE_SIZE
     offset_val = 0
     total = 0
     vigencia = periodo
     umbral = (umbral_pct or 5.0) / 100.0
 
-    ret_recibidas_ids_sql = ", ".join(str(a) for a in atributos.ret_recibidas_ids)
-    ret_practicadas_ids_sql = ", ".join(str(a) for a in atributos.ret_practicadas_ids)
-    sql = INEXACTOS_RETENCIONES_SQL.format(
-        ret_recibidas_ids=ret_recibidas_ids_sql,
-        ret_practicadas_ids=ret_practicadas_ids_sql,
-        payment_filter=payment_filter,
-    )
-
     while True:
         params = {
-            "id_prgrma_inexactos": id_prgrma_inexactos,
             "vigencia": vigencia,
             "umbral": umbral,
             "offset": offset_val,

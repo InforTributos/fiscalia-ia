@@ -178,35 +178,33 @@ async def test_paginar_contribuyentes_resultado_vacio_termina():
 
 
 @pytest.mark.asyncio
-async def test_omisos_conocidos_usa_tablas_reales(mock_lookup):
+async def test_omisos_conocidos_usa_tablas_reales():
     client = AsyncMock()
     client.execute_sql.return_value = [
         {"idntfccion": "9003189639", "nmbre_rzon_scial": "TEST S.A.",
          "id_actvdad_ecnmca": "4711", "drccion": "Calle 10", "id_sjto_impsto": 123},
     ]
 
-    items = await _collect(obtener_omisos_conocidos(client, mock_lookup, "2024", "2024", 50))
+    items = await _collect(obtener_omisos_conocidos(client, "2024", "2024", 50))
     assert len(items) == 1
     assert items[0]["idntfccion"] == "9003189639"
 
 
 @pytest.mark.asyncio
-async def test_omisos_desconocidos_dian_sin_registro(mock_lookup):
+async def test_omisos_desconocidos_dian_sin_registro():
     client = AsyncMock()
-    repo = mock_lookup
-    repo.get_programa_id.return_value = 1
     client.execute_sql.return_value = [
         {"nit": "9012345678", "razon_social": "NO REGISTRADA S.A.",
          "ciiu": "4721", "valor_dian": 50000000, "vgncia": "2024"},
     ]
 
-    items = await _collect(obtener_omisos_desconocidos(client, repo, "2024", 50))
+    items = await _collect(obtener_omisos_desconocidos(client, "2024", 50))
     assert len(items) == 1
     assert items[0]["nit"] == "9012345678"
 
 
 @pytest.mark.asyncio
-async def test_inexactos_ciiu_tarifa_dian_mayor(mock_lookup):
+async def test_inexactos_ciiu_tarifa_dian_mayor():
     client = AsyncMock()
     client.execute_sql.return_value = [
         {"idntfccion": "9003189639", "nmbre_rzon_scial": "TEST",
@@ -214,13 +212,13 @@ async def test_inexactos_ciiu_tarifa_dian_mayor(mock_lookup):
          "ciiu_dian": "4721", "tarifa_dian": 0.010},
     ]
 
-    items = await _collect(obtener_inexactos_ciiu(client, mock_lookup, "2024", 50))
+    items = await _collect(obtener_inexactos_ciiu(client, "2024", 50))
     assert len(items) == 1
     assert items[0]["ciiu_declarado"] == "4711"
 
 
 @pytest.mark.asyncio
-async def test_inexactos_retenciones_diferencia_mayor_umbral(mock_lookup):
+async def test_inexactos_retenciones_diferencia_mayor_umbral():
     client = AsyncMock()
     client.execute_sql.return_value = [
         {"idntfccion": "9003189639", "nmbre_rzon_scial": "TEST",
@@ -229,7 +227,7 @@ async def test_inexactos_retenciones_diferencia_mayor_umbral(mock_lookup):
          "diferencia_pct": 33.3},
     ]
 
-    items = await _collect(obtener_inexactos_retenciones(client, mock_lookup, "2024", 50))
+    items = await _collect(obtener_inexactos_retenciones(client, "2024", 50))
     assert len(items) == 1
     assert items[0]["diferencia_pct"] == 33.3
 
