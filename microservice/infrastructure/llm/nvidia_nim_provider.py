@@ -86,12 +86,14 @@ async def _auto_select_model() -> str:
     )
 
     configured = settings.llm_tier2_model
-    if await _verify_model(client, configured):
-        logger.info("NVIDIA: modelo configurado %s funciona", configured)
-        SELECTED_MODEL = configured
-        return configured
-
-    logger.warning("NVIDIA: modelo %s NO disponible, buscando alternativas...", configured)
+    if configured:
+        if await _verify_model(client, configured):
+            logger.info("NVIDIA: modelo configurado %s funciona", configured)
+            SELECTED_MODEL = configured
+            return configured
+        logger.warning("NVIDIA: modelo %s NO disponible, buscando alternativas...", configured)
+    else:
+        logger.info("NVIDIA: sin modelo configurado, buscando entre modelos preferidos...")
     for model in PREFERRED_MODELS:
         if await _verify_model(client, model):
             logger.info("NVIDIA: seleccionado automaticamente: %s", model)

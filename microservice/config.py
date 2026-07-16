@@ -20,31 +20,35 @@ class Settings(BaseSettings):
 
     llm_tier1_api_key: str = ""
     llm_tier1_provider: str = "anthropic"
-    llm_tier1_model: str = "claude-sonnet-4-20250506"
+    llm_tier1_model: str = ""
     llm_tier1_api_base: str | None = None
 
     llm_tier2_api_key: str = ""
-    llm_tier2_model: str = "qwen/qwen2.5-7b-instruct"
+    llm_tier2_model: str = ""
     llm_tier2_api_base: str = "https://integrate.api.nvidia.com/v1"
 
     llm_tier3_api_key: str = ""
-    llm_tier3_model: str = "Qwen/Qwen2.5-7B-Instruct"
+    llm_tier3_model: str = ""
     llm_tier3_api_base: str = "https://api-inference.huggingface.co/v1"
 
     llm_max_tokens: int = 4096
     llm_timeout: int = 0
+    llm_rate_limit_rpm: int = 40
 
     cache_ttl_seconds: int = 3600
 
-    retry_max_attempts: int = 1
+    retry_max_attempts: int = 3
     retry_backoff_factor: int = 2
     retry_timeout: int = 0
 
     max_concurrent_processes: int = 5
     process_timeout_minutes: int = 0
 
-    nit_concurrency: int = 5
+    nit_concurrency: int = 3
     batch_db_size: int = 50
+    batch_auto_scale: bool = True
+    batch_min_size: int = 10
+    batch_max_size: int = 200
 
     pool_min_size: int = 4
     pool_max_size: int = 20
