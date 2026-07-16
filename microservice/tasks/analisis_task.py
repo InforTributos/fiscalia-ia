@@ -430,7 +430,7 @@ async def _enriquecer_con_comportamiento(
 
         contribuyente = None
         for p in pares:
-            if p.nit == contribuyente_nit:
+            if p.contribuyente_nit == contribuyente_nit:
                 contribuyente = p
                 break
 
@@ -441,7 +441,7 @@ async def _enriquecer_con_comportamiento(
                 return None, []
             contribuyente = build_contributor_metrics(row_contrib, periodo)
 
-        pares_sin_nit = [p for p in pares if p.nit != contribuyente_nit]
+        pares_sin_nit = [p for p in pares if p.contribuyente_nit != contribuyente_nit]
         resultado = calcular_score_comportamental(contribuyente, pares_sin_nit, benchmark)
 
         hallazgos = []

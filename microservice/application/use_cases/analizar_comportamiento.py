@@ -38,7 +38,7 @@ class AnalizarComportamientoUseCase:
         pares = [
             build_contributor_metrics(peer, periodo)
             for peer in pares_rows
-            if str(peer.get("nit", "")) != contribuyente.nit
+            if str(peer.get("nit", "")) != contribuyente.contribuyente_nit
         ]
         benchmark = build_benchmark(pares, ciiu_ref, regimen_ref or "", periodo)
         return calcular_score_comportamental(contribuyente, pares, benchmark, min_pares=min_pares)
