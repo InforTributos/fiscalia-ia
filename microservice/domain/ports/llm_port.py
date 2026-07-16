@@ -17,3 +17,8 @@ class LLMProvider(ABC):
     @abstractmethod
     async def chat_json(self, messages: list[dict], schema: dict | None = None) -> dict:
         ...
+
+    async def discover_models(self) -> list[str]:
+        """Consulta la API del proveedor para listar modelos disponibles.
+        Retorna lista vacía si el proveedor no soporta descubrimiento."""
+        return []
