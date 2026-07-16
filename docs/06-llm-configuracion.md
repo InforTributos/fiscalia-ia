@@ -190,33 +190,57 @@ Top 3 factores de mayor peso:
 
 ## Variables de Entorno
 
+### Descubrimiento Automático (Recomendado)
+
+Los modelos se descubren automáticamente consultando la API de cada proveedor al iniciar.
+No es necesario configurar `LLM_TIER*_MODEL`:
+
+```env
+# === LLM Tier 1 (NVIDIA NIM) ===
+LLM_TIER1_PROVIDER=nvidia_nim
+LLM_TIER1_API_KEY=nvapi-...
+# LLM_TIER1_MODEL=  # Opcional: se descubre automáticamente
+
+# === LLM Tier 2 (Nvidia NIM, gratis) ===
+LLM_TIER2_API_KEY=nvapi-...
+# LLM_TIER2_MODEL=  # Opcional: se descubre automáticamente
+
+# === LLM Tier 3 (HuggingFace, gratis) ===
+LLM_TIER3_API_KEY=hf_...
+# LLM_TIER3_MODEL=  # Opcional: se descubre automáticamente
+```
+
+### Configuración Manual (Opcional)
+
+Si se requiere forzar un modelo específico, configurar `LLM_TIER*_MODEL`:
+
 ```env
 # === LLM Tier 1 (pago) ===
 LLM_TIER1_PROVIDER=anthropic
-LLM_TIER1_API_KEY=
+LLM_TIER1_API_KEY=sk-ant-...
 LLM_TIER1_MODEL=claude-sonnet-4-20250506
 
 # === LLM Tier 2 (Nvidia NIM, gratis) ===
-LLM_TIER2_API_KEY=
-LLM_TIER2_MODEL=qwen/qwen2.5-7b-instruct
+LLM_TIER2_API_KEY=nvapi-...
+LLM_TIER2_MODEL=meta/llama-3.1-8b-instruct
 LLM_TIER2_BASE_URL=https://integrate.api.nvidia.com/v1
 
 # === LLM Tier 3 (HuggingFace, gratis) ===
-LLM_TIER3_API_KEY=
+LLM_TIER3_API_KEY=hf_...
 LLM_TIER3_MODEL=Qwen/Qwen2.5-7B-Instruct
 LLM_TIER3_BASE_URL=https://api-inference.huggingface.co/v1
 ```
 
 | Variable | Descripción | Ejemplo |
 |---|---|---|
-| `LLM_TIER1_PROVIDER` | Proveedor primario: `anthropic` o `openai` | `anthropic` |
+| `LLM_TIER1_PROVIDER` | Proveedor primario: `anthropic` o `openai` | `nvidia_nim` |
 | `LLM_TIER1_API_KEY` | API key de Anthropic o OpenAI | `sk-ant-...` |
-| `LLM_TIER1_MODEL` | Modelo del Tier 1 | `claude-sonnet-4-20250506` |
+| `LLM_TIER1_MODEL` | Modelo del Tier 1 (opcional) | `claude-sonnet-4-20250506` |
 | `LLM_TIER2_API_KEY` | API key de NVIDIA Developer Program | `nvapi-...` |
-| `LLM_TIER2_MODEL` | Modelo en Nvidia NIM | `qwen/qwen2.5-7b-instruct` |
+| `LLM_TIER2_MODEL` | Modelo en Nvidia NIM (opcional) | `meta/llama-3.1-8b-instruct` |
 | `LLM_TIER2_BASE_URL` | Endpoint de Nvidia NIM | `https://integrate.api.nvidia.com/v1` |
 | `LLM_TIER3_API_KEY` | Token de HuggingFace Inference Providers | `hf_...` |
-| `LLM_TIER3_MODEL` | Modelo en HuggingFace | `Qwen/Qwen2.5-7B-Instruct` |
+| `LLM_TIER3_MODEL` | Modelo en HuggingFace (opcional) | `Qwen/Qwen2.5-7B-Instruct` |
 | `LLM_TIER3_BASE_URL` | Endpoint de HuggingFace | `https://api-inference.huggingface.co/v1` |
 
 ## Retry Config
