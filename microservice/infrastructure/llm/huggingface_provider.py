@@ -1,11 +1,39 @@
 import json
 import logging
+import re
 
 from config import settings
+from domain.errors import LLMRateLimitError
 from domain.ports.llm_port import LLMProvider, LLMResponse
 from openai import AsyncOpenAI
+from openai import RateLimitError as OpenAIRateLimitError
 
 logger = logging.getLogger(__name__)
+
+
+async def _fetch_available_models(client) -> list[str]:
+    """Consulta /v1/models para obtener lista de modelos disponibles."""
+    try:
+        response = await client.models.list()
+        return [m.id for m in response.data if hasattr(m, "id")]
+    except Exception as e:
+        logger.warning("HuggingFace: error consultando modelos disponibles: %s", str(e)[:100])
+        return []
+
+
+def _clean_explanacion(text: str) -> str:
+    text = text.strip()
+    if re.match(r"^```", text):
+        lines = text.split("\n")
+        if lines[-1].strip() == "```":
+            text = "\n".join(lines[1:-1])
+        else:
+            text = "\n".join(lines[1:])
+        text = text.strip()
+    text = re.sub(r'```json\s*\{.*?\}\s*```', '', text, flags=re.DOTALL)
+    text = re.sub(r'```\s*\{.*?\}\s*```', '', text, flags=re.DOTALL)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
 
 def _safe_int(obj, *attrs):
@@ -28,14 +56,24 @@ class HuggingFaceProvider(LLMProvider):
         )
         self.model = settings.llm_tier3_model
 
-    async def chat(self, messages: list[dict], **kwargs) -> LLMResponse:
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm_max_tokens),
-            temperature=kwargs.get("temperature", 0.1),
-            timeout=kwargs.get("timeout", settings.llm_timeout),
+    async def discover_models(self) -> list[str]:
+        client = AsyncOpenAI(
+            api_key=settings.llm_tier3_api_key,
+            base_url=settings.llm_tier3_api_base or "https://api-inference.huggingface.co/v1",
         )
+        return await _fetch_available_models(client)
+
+    async def chat(self, messages: list[dict], **kwargs) -> LLMResponse:
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm_max_tokens),
+                temperature=kwargs.get("temperature", 0.1),
+                timeout=kwargs.get("timeout", settings.llm_timeout),
+            )
+        except OpenAIRateLimitError as e:
+            raise LLMRateLimitError(str(e))
 
         return LLMResponse(
             content=response.choices[0].message.content or "",
@@ -46,13 +84,16 @@ class HuggingFaceProvider(LLMProvider):
         )
 
     async def chat_json(self, messages: list[dict], schema: dict | None = None) -> dict:
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=settings.llm_max_tokens,
-            temperature=0.1,
-            timeout=settings.llm_timeout or None,
-        )
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=settings.llm_max_tokens,
+                temperature=0.1,
+                timeout=settings.llm_timeout or None,
+            )
+        except OpenAIRateLimitError as e:
+            raise LLMRateLimitError(str(e))
 
         text = response.choices[0].message.content or "{}"
         tokens_in = _safe_int(response, 'usage', 'prompt_tokens')
@@ -67,7 +108,7 @@ class HuggingFaceProvider(LLMProvider):
             result.setdefault("tokens_entrada", tokens_in)
             result.setdefault("tokens_salida", tokens_out)
             return result
-        except (ValueError, json.JSONDecodeError) as e:
-            logger.warning("Error parseando respuesta HuggingFace: %s", str(e))
-            return {"explicacion": text, "hallazgos_enriquecidos": [],
+        except (ValueError, json.JSONDecodeError):
+            logger.warning("Respuesta HuggingFace sin JSON válido — usando texto plano")
+            return {"explicacion": _clean_explanacion(text), "hallazgos_enriquecidos": [],
                     "tokens_entrada": tokens_in, "tokens_salida": tokens_out}

@@ -2,10 +2,22 @@ import json
 import logging
 
 from config import settings
+from domain.errors import LLMRateLimitError
 from domain.ports.llm_port import LLMProvider, LLMResponse
 from openai import AsyncOpenAI
+from openai import RateLimitError as OpenAIRateLimitError
 
 logger = logging.getLogger(__name__)
+
+
+async def _fetch_available_models(client) -> list[str]:
+    """Consulta /v1/models para obtener lista de modelos disponibles."""
+    try:
+        response = await client.models.list()
+        return [m.id for m in response.data if hasattr(m, "id")]
+    except Exception as e:
+        logger.warning("OpenAI: error consultando modelos disponibles: %s", str(e)[:100])
+        return []
 
 
 def _safe_int(obj, *attrs):
@@ -25,14 +37,21 @@ class OpenAIProvider(LLMProvider):
         self.client = AsyncOpenAI(api_key=settings.llm_tier1_api_key)
         self.model = "gpt-4o"
 
+    async def discover_models(self) -> list[str]:
+        client = AsyncOpenAI(api_key=settings.llm_tier1_api_key)
+        return await _fetch_available_models(client)
+
     async def chat(self, messages: list[dict], **kwargs) -> LLMResponse:
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=kwargs.get("max_tokens", settings.llm_max_tokens),
-            temperature=kwargs.get("temperature", 0.1),
-            timeout=kwargs.get("timeout", settings.llm_timeout),
-        )
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=kwargs.get("max_tokens", settings.llm_max_tokens),
+                temperature=kwargs.get("temperature", 0.1),
+                timeout=kwargs.get("timeout", settings.llm_timeout),
+            )
+        except OpenAIRateLimitError as e:
+            raise LLMRateLimitError(str(e))
 
         return LLMResponse(
             content=response.choices[0].message.content or "",
@@ -43,13 +62,16 @@ class OpenAIProvider(LLMProvider):
         )
 
     async def chat_json(self, messages: list[dict], schema: dict | None = None) -> dict:
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=settings.llm_max_tokens,
-            temperature=0.1,
-            timeout=settings.llm_timeout or None,
-        )
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=settings.llm_max_tokens,
+                temperature=0.1,
+                timeout=settings.llm_timeout or None,
+            )
+        except OpenAIRateLimitError as e:
+            raise LLMRateLimitError(str(e))
 
         text = response.choices[0].message.content or "{}"
         tokens_in = _safe_int(response, 'usage', 'prompt_tokens')

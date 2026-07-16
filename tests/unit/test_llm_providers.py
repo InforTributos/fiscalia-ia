@@ -2,10 +2,9 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from infrastructure.llm.anthropic_provider import AnthropicProvider
-from infrastructure.llm.openai_provider import OpenAIProvider
 from infrastructure.llm.huggingface_provider import HuggingFaceProvider
 from infrastructure.llm.nvidia_nim_provider import NvidiaNIMProvider
-
+from infrastructure.llm.openai_provider import OpenAIProvider
 
 # ─── Helper factories ─────────────────────────────────────────────────────────
 
@@ -542,3 +541,131 @@ class TestNvidiaNIMProvider:
         provider = NvidiaNIMProvider()
         result = await provider.chat_json([{"role": "user", "content": "X"}])
         assert result == {"tokens_entrada": 0, "tokens_salida": 0}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Descubrimiento de Modelos
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestNvidiaNIMProviderDiscovery:
+
+    @patch("infrastructure.llm.nvidia_nim_provider.settings")
+    @patch("infrastructure.llm.nvidia_nim_provider.AsyncOpenAI")
+    async def test_discover_models_returns_list(self, mock_openai_cls, mock_settings):
+        _default_settings(mock_settings)
+        mock_models = MagicMock()
+        mock_models.data = [
+            MagicMock(id="meta/llama-3.1-8b-instruct"),
+            MagicMock(id="mistralai/mistral-7b-instruct-v0.3"),
+            MagicMock(id="qwen/qwen2.5-7b-instruct"),
+        ]
+        mock_client = MagicMock()
+        mock_client.models.list = AsyncMock(return_value=mock_models)
+        mock_openai_cls.return_value = mock_client
+
+        provider = NvidiaNIMProvider()
+        models = await provider.discover_models()
+
+        assert isinstance(models, list)
+        assert "meta/llama-3.1-8b-instruct" in models
+        assert "mistralai/mistral-7b-instruct-v0.3" in models
+
+    @patch("infrastructure.llm.nvidia_nim_provider.settings")
+    @patch("infrastructure.llm.nvidia_nim_provider.AsyncOpenAI")
+    async def test_discover_models_api_error_returns_empty(self, mock_openai_cls, mock_settings):
+        _default_settings(mock_settings)
+        mock_client = MagicMock()
+        mock_client.models.list = AsyncMock(side_effect=Exception("API error"))
+        mock_openai_cls.return_value = mock_client
+
+        provider = NvidiaNIMProvider()
+        models = await provider.discover_models()
+
+        assert models == []
+
+
+class TestHuggingFaceProviderDiscovery:
+
+    @patch("infrastructure.llm.huggingface_provider.settings")
+    @patch("infrastructure.llm.huggingface_provider.AsyncOpenAI")
+    async def test_discover_models_returns_list(self, mock_openai_cls, mock_settings):
+        _default_settings(mock_settings)
+        mock_models = MagicMock()
+        mock_models.data = [
+            MagicMock(id="Qwen/Qwen2.5-7B-Instruct"),
+            MagicMock(id="mistralai/Mistral-7B-Instruct-v0.3"),
+        ]
+        mock_client = MagicMock()
+        mock_client.models.list = AsyncMock(return_value=mock_models)
+        mock_openai_cls.return_value = mock_client
+
+        provider = HuggingFaceProvider()
+        models = await provider.discover_models()
+
+        assert isinstance(models, list)
+        assert "Qwen/Qwen2.5-7B-Instruct" in models
+
+    @patch("infrastructure.llm.huggingface_provider.settings")
+    @patch("infrastructure.llm.huggingface_provider.AsyncOpenAI")
+    async def test_discover_models_api_error_returns_empty(self, mock_openai_cls, mock_settings):
+        _default_settings(mock_settings)
+        mock_client = MagicMock()
+        mock_client.models.list = AsyncMock(side_effect=Exception("Connection error"))
+        mock_openai_cls.return_value = mock_client
+
+        provider = HuggingFaceProvider()
+        models = await provider.discover_models()
+
+        assert models == []
+
+
+class TestOpenAIProviderDiscovery:
+
+    @patch("infrastructure.llm.openai_provider.settings")
+    @patch("infrastructure.llm.openai_provider.AsyncOpenAI")
+    async def test_discover_models_returns_list(self, mock_openai_cls, mock_settings):
+        _default_settings(mock_settings)
+        mock_models = MagicMock()
+        mock_models.data = [
+            MagicMock(id="gpt-4o"),
+            MagicMock(id="gpt-4o-mini"),
+            MagicMock(id="gpt-3.5-turbo"),
+        ]
+        mock_client = MagicMock()
+        mock_client.models.list = AsyncMock(return_value=mock_models)
+        mock_openai_cls.return_value = mock_client
+
+        provider = OpenAIProvider()
+        models = await provider.discover_models()
+
+        assert isinstance(models, list)
+        assert "gpt-4o" in models
+
+    @patch("infrastructure.llm.openai_provider.settings")
+    @patch("infrastructure.llm.openai_provider.AsyncOpenAI")
+    async def test_discover_models_api_error_returns_empty(self, mock_openai_cls, mock_settings):
+        _default_settings(mock_settings)
+        mock_client = MagicMock()
+        mock_client.models.list = AsyncMock(side_effect=Exception("Rate limit"))
+        mock_openai_cls.return_value = mock_client
+
+        provider = OpenAIProvider()
+        models = await provider.discover_models()
+
+        assert models == []
+
+
+class TestAnthropicProviderDiscovery:
+
+    @patch("infrastructure.llm.anthropic_provider.settings")
+    @patch("infrastructure.llm.anthropic_provider.anthropic.AsyncAnthropic")
+    async def test_discover_models_returns_known_models(self, mock_anthropic_cls, mock_settings):
+        _default_settings(mock_settings)
+        mock_anthropic_cls.return_value = MagicMock()
+
+        provider = AnthropicProvider()
+        models = await provider.discover_models()
+
+        assert isinstance(models, list)
+        assert len(models) > 0
+        assert "claude-sonnet-4-20250506" in models

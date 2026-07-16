@@ -2,10 +2,19 @@ import json
 import logging
 
 import anthropic
+from anthropic import RateLimitError as AnthropicRateLimitError
 from config import settings
+from domain.errors import LLMRateLimitError
 from domain.ports.llm_port import LLMProvider, LLMResponse
 
 logger = logging.getLogger(__name__)
+
+ANTHROPIC_KNOWN_MODELS = [
+    "claude-sonnet-4-20250506",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-haiku-20240307",
+]
 
 
 def _safe_int(obj, *attrs):
@@ -25,6 +34,9 @@ class AnthropicProvider(LLMProvider):
         self.client = anthropic.AsyncAnthropic(api_key=settings.llm_tier1_api_key)
         self.model = settings.llm_tier1_model
 
+    async def discover_models(self) -> list[str]:
+        return ANTHROPIC_KNOWN_MODELS.copy()
+
     async def chat(self, messages: list[dict], **kwargs) -> LLMResponse:
         system = ""
         msgs = []
@@ -34,14 +46,17 @@ class AnthropicProvider(LLMProvider):
             else:
                 msgs.append(m)
 
-        response = await self.client.messages.create(
-            model=self.model,
-            system=system or None,
-            messages=msgs,
-            max_tokens=kwargs.get("max_tokens", settings.llm_max_tokens),
-            temperature=kwargs.get("temperature", 0.1),
-            timeout=kwargs.get("timeout", settings.llm_timeout or None),
-        )
+        try:
+            response = await self.client.messages.create(
+                model=self.model,
+                system=system or None,
+                messages=msgs,
+                max_tokens=kwargs.get("max_tokens", settings.llm_max_tokens),
+                temperature=kwargs.get("temperature", 0.1),
+                timeout=kwargs.get("timeout", settings.llm_timeout or None),
+            )
+        except AnthropicRateLimitError as e:
+            raise LLMRateLimitError(str(e))
 
         return LLMResponse(
             content=response.content[0].text if response.content else "",
@@ -60,14 +75,17 @@ class AnthropicProvider(LLMProvider):
             else:
                 msgs.append(m)
 
-        response = await self.client.messages.create(
-            model=self.model,
-            system=system or None,
-            messages=msgs,
-            max_tokens=settings.llm_max_tokens,
-            temperature=0.1,
-            timeout=settings.llm_timeout or None,
-        )
+        try:
+            response = await self.client.messages.create(
+                model=self.model,
+                system=system or None,
+                messages=msgs,
+                max_tokens=settings.llm_max_tokens,
+                temperature=0.1,
+                timeout=settings.llm_timeout or None,
+            )
+        except AnthropicRateLimitError as e:
+            raise LLMRateLimitError(str(e))
 
         text = response.content[0].text if response.content else "{}"
         tokens_in = _safe_int(response, 'usage', 'input_tokens')
