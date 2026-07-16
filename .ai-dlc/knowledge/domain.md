@@ -58,7 +58,7 @@
 
 ## Persistencia PostgreSQL
 - Pool asyncpg con `min_size=4, max_size=20, timeout=5` (configurable)
-- Tablas: `clientes`, `procesos`, `proceso_intentos`, `proceso_detalle`, `proceso_errores`, `proceso_detalle_errores`
+- Tablas: `entidades_fiscalizadoras`, `procesos`, `proceso_intentos`, `proceso_detalle`, `proceso_errores`, `proceso_detalle_errores`
 - Repositorios: `PostgresProcesoRepo`, `PostgresContribuyenteRepo` (implementan ABCs en `domain/ports/`)
 - Conexión vía `infrastructure/persistence/connection.py` (lazy pool singleton)
 

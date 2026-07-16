@@ -13,7 +13,7 @@ def test_analisis_retorna_200(mock_pagination, mock_mcp_cls, mock_llm_cls):
     mock_mcp = AsyncMock()
     mock_mcp_cls.return_value = mock_mcp
     mock_pagination.return_value = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "razon_social": "COMERCIO XYZ S.A.S.",
         "ciiu": "4711",
         "regimen": "COMUN",
@@ -33,7 +33,7 @@ def test_analisis_retorna_200(mock_pagination, mock_mcp_cls, mock_llm_cls):
     response = client.post("/api/v1/analizar/9003189639")
     assert response.status_code == 200
     data = response.json()
-    assert data["nit"] == "9003189639"
+    assert data["contribuyente_nit"] == "9003189639"
     assert data["clasificacion"] == "INEXACTO"
     assert data["srf_total"] > 0
 

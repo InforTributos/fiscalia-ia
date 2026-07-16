@@ -1,25 +1,19 @@
-def test_create_campana_201(client, campana_payload):
-    resp = client.post("/campana", json=campana_payload)
+def test_create_proceso_completo_201(client, proceso_payload):
+    """POST /proceso con tipo=COMPLETO funciona igual que campana antes"""
+    payload = {**proceso_payload, "tipo": "COMPLETO"}
+    resp = client.post("/proceso", json=payload)
     assert resp.status_code == 201
     body = resp.json()
     assert "proceso_id" in body
     assert body["estado"] in ("EN_COLA", "PREFILTRANDO")
 
 
-def test_create_campana_defaults(client):
-    resp = client.post("/campana", json={"periodo": "2024"})
+def test_create_proceso_completo_respuesta(client, proceso_payload):
+    """POST /proceso tipo=COMPLETO devuelve estructura completa"""
+    payload = {**proceso_payload, "tipo": "COMPLETO"}
+    resp = client.post("/proceso", json=payload)
     assert resp.status_code == 201
     body = resp.json()
     assert "nombre" in body
-    assert "mensaje" in body
-
-
-def test_create_campana_with_ciiu(client):
-    resp = client.post("/campana", json={
-        "periodo": "2024",
-        "actividad_economica": "4711",
-        "nombre": "Campana Comercio 2024",
-    })
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["estado"] in ("EN_COLA", "PREFILTRANDO")
+    assert "entidad_nit" in body
+    assert "resumen" in body

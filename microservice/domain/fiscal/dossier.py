@@ -18,7 +18,7 @@ def construir_expediente_fiscal(grafo_riesgo: dict) -> dict:
     resumen = _resumen(grafo_riesgo, score, evidencia)
 
     return {
-        "nit": grafo_riesgo.get("nit", ""),
+        "contribuyente_nit": grafo_riesgo.get("contribuyente_nit", ""),
         "periodo": grafo_riesgo.get("periodo", ""),
         "generado_en": datetime.now(UTC).isoformat(),
         "score": score,
@@ -37,7 +37,7 @@ def construir_expediente_fiscal(grafo_riesgo: dict) -> dict:
 def expediente_to_markdown(expediente: dict) -> str:
     score = expediente["score"]
     lines = [
-        f"# Expediente Fiscal - NIT {expediente['nit']}",
+        f"# Expediente Fiscal - NIT {expediente['contribuyente_nit']}",
         "",
         f"Periodo: {expediente['periodo']}",
         f"Prioridad: {score['prioridad']}",
@@ -57,11 +57,11 @@ def expediente_to_markdown(expediente: dict) -> str:
 
 
 def _resumen(grafo_riesgo: dict, score: dict, evidencia: list[str]) -> str:
-    nit = grafo_riesgo.get("nit", "")
+    contribuyente_nit = grafo_riesgo.get("contribuyente_nit", "")
     prioridad = score["prioridad"]
     principales = "; ".join(evidencia[:3]) if evidencia else "sin evidencia material"
     return (
-        f"El contribuyente {nit} queda clasificado con prioridad {prioridad}. "
+        f"El contribuyente {contribuyente_nit} queda clasificado con prioridad {prioridad}. "
         f"La seleccion se soporta en: {principales}."
     )
 

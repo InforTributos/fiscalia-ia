@@ -45,7 +45,7 @@ def mock_router_repo():
     from routers.proceso import repo as real_repo
 
     with (
-        patch.object(real_repo, "obtener_cliente_por_nit", AsyncMock(return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT})),
+        patch.object(real_repo, "obtener_entidad_por_nit", AsyncMock(return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT})),
         patch.object(real_repo, "obtener_proceso_por_criteria", AsyncMock(return_value=None)),
         patch.object(real_repo, "crear_proceso", AsyncMock(return_value=VALID_PROCESO_ID)),
         patch.object(real_repo, "crear_intento", AsyncMock(return_value=1)),

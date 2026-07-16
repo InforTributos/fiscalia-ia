@@ -2,7 +2,6 @@ import uuid
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
-
 from application.use_cases.analizar_comportamiento import AnalizarComportamientoUseCase
 from application.use_cases.analizar_grafo_riesgo import AnalizarGrafoRiesgoUseCase
 from application.use_cases.aplicar_reglas_fiscales import AplicarReglasFiscalesUseCase
@@ -21,7 +20,6 @@ from domain.errors import (
     ProcesoNoEncontradoError,
     SolicitudInvalidaError,
 )
-
 
 # ── Fixtures compartidos ──
 
@@ -76,17 +74,17 @@ class TestAnalizarComportamientoUseCase:
         mock_proceso_repo,
     ):
         mock_behavioral_repo.obtener_contribuyente.return_value = {
-            "nit": "123",
+            "contribuyente_nit": "123",
             "ciiu": "4711",
         }
         mock_behavioral_repo.obtener_pares.return_value = [
-            {"nit": "456", "ciiu": "4711"},
-            {"nit": "789", "ciiu": "4711"},
+            {"contribuyente_nit": "456", "ciiu": "4711"},
+            {"contribuyente_nit": "789", "ciiu": "4711"},
         ]
         mock_metrics.side_effect = [
-            _mock_cm(nit="123", ciiu="4711", regimen="COMUN"),
-            _mock_cm(nit="456", ciiu="4711", regimen="COMUN"),
-            _mock_cm(nit="789", ciiu="4711", regimen="COMUN"),
+            _mock_cm(contribuyente_nit="123", ciiu="4711", regimen="COMUN"),
+            _mock_cm(contribuyente_nit="456", ciiu="4711", regimen="COMUN"),
+            _mock_cm(contribuyente_nit="789", ciiu="4711", regimen="COMUN"),
         ]
         mock_benchmark.return_value = _mock_cm(total_pares=2)
         mock_score.return_value = {"score_comportamental": 75.0}
@@ -95,7 +93,7 @@ class TestAnalizarComportamientoUseCase:
             behavioral_repo=mock_behavioral_repo,
             proceso_repo=mock_proceso_repo,
         )
-        result = await uc.analizar_nit(nit="123", periodo="2024")
+        result = await uc.analizar_nit(contribuyente_nit="123", periodo="2024")
         assert result["score_comportamental"] == 75.0
         mock_behavioral_repo.obtener_contribuyente.assert_awaited_once_with("123", "2024")
         mock_behavioral_repo.obtener_pares.assert_awaited_once()
@@ -112,12 +110,12 @@ class TestAnalizarComportamientoUseCase:
         mock_proceso_repo,
     ):
         mock_behavioral_repo.obtener_contribuyente.return_value = {
-            "nit": "123",
+            "contribuyente_nit": "123",
             "ciiu": "4711",
             "regimen": "PREFERENCIAL",
         }
         mock_behavioral_repo.obtener_pares.return_value = []
-        mock_metrics.return_value = _mock_cm(nit="123", ciiu="8520", regimen="COMUN")
+        mock_metrics.return_value = _mock_cm(contribuyente_nit="123", ciiu="8520", regimen="COMUN")
         mock_benchmark.return_value = _mock_cm(total_pares=0)
         mock_score.return_value = {"score_comportamental": 50.0}
 
@@ -126,7 +124,7 @@ class TestAnalizarComportamientoUseCase:
             proceso_repo=mock_proceso_repo,
         )
         result = await uc.analizar_nit(
-            nit="123", periodo="2024", ciiu="8520", regimen="COMUN",
+            contribuyente_nit="123", periodo="2024", ciiu="8520", regimen="COMUN",
         )
         assert result["score_comportamental"] == 50.0
         mock_behavioral_repo.obtener_pares.assert_awaited_once_with("2024", "8520", "COMUN")
@@ -138,7 +136,7 @@ class TestAnalizarComportamientoUseCase:
             proceso_repo=mock_proceso_repo,
         )
         with pytest.raises(NITNoEncontradoError):
-            await uc.analizar_nit(nit="999", periodo="2024")
+            await uc.analizar_nit(contribuyente_nit="999", periodo="2024")
 
     @patch("application.use_cases.analizar_comportamiento.build_contributor_metrics")
     @patch("application.use_cases.analizar_comportamiento.build_benchmark")
@@ -151,9 +149,9 @@ class TestAnalizarComportamientoUseCase:
         mock_behavioral_repo,
         mock_proceso_repo,
     ):
-        mock_behavioral_repo.obtener_contribuyente.return_value = {"nit": "123"}
+        mock_behavioral_repo.obtener_contribuyente.return_value = {"contribuyente_nit": "123"}
         mock_behavioral_repo.obtener_pares.return_value = []
-        mock_metrics.return_value = _mock_cm(nit="123", ciiu="4711", regimen=None)
+        mock_metrics.return_value = _mock_cm(contribuyente_nit="123", ciiu="4711", regimen=None)
         mock_benchmark.return_value = _mock_cm(total_pares=0)
         mock_score.return_value = {"score_comportamental": 30.0}
 
@@ -161,7 +159,7 @@ class TestAnalizarComportamientoUseCase:
             behavioral_repo=mock_behavioral_repo,
             proceso_repo=mock_proceso_repo,
         )
-        result = await uc.analizar_nit(nit="123", periodo="2024", min_pares=5)
+        result = await uc.analizar_nit(contribuyente_nit="123", periodo="2024", min_pares=5)
         assert result["score_comportamental"] == 30.0
         mock_score.assert_called_once()
         assert mock_score.call_args[1]["min_pares"] == 5
@@ -173,9 +171,9 @@ class TestAnalizarComportamientoUseCase:
             "criteria": {"periodo": "2024"},
         }
         mock_proceso_repo.listar_proceso_detalle.return_value = (3, [
-            {"nit": "111"},
-            {"nit": "222"},
-            {"nit": "333"},
+            {"contribuyente_nit": "111"},
+            {"contribuyente_nit": "222"},
+            {"contribuyente_nit": "333"},
         ])
 
         uc = AnalizarComportamientoUseCase(
@@ -208,8 +206,8 @@ class TestAnalizarComportamientoUseCase:
         pid = uuid.uuid4()
         mock_proceso_repo.obtener_proceso.return_value = {"criteria": {"periodo": "2024"}}
         mock_proceso_repo.listar_proceso_detalle.return_value = (2, [
-            {"nit": "111"},
-            {"nit": "222"},
+            {"contribuyente_nit": "111"},
+            {"contribuyente_nit": "222"},
         ])
 
         uc = AnalizarComportamientoUseCase(
@@ -224,7 +222,7 @@ class TestAnalizarComportamientoUseCase:
         assert result["total_evaluados"] == 2
         assert result["total_rankeados"] == 1
         assert len(result["errores"]) == 1
-        assert result["errores"][0]["nit"] == "222"
+        assert result["errores"][0]["contribuyente_nit"] == "222"
         assert "MCP timeout" in result["errores"][0]["mensaje"]
 
     async def test_ranking_proceso_periodo_override(self, mock_behavioral_repo, mock_proceso_repo):
@@ -232,7 +230,7 @@ class TestAnalizarComportamientoUseCase:
         mock_proceso_repo.obtener_proceso.return_value = {
             "criteria": {"periodo": "2023"},
         }
-        mock_proceso_repo.listar_proceso_detalle.return_value = (1, [{"nit": "111"}])
+        mock_proceso_repo.listar_proceso_detalle.return_value = (1, [{"contribuyente_nit": "111"}])
 
         uc = AnalizarComportamientoUseCase(
             behavioral_repo=mock_behavioral_repo,
@@ -272,10 +270,10 @@ class TestAnalizarGrafoRiesgoUseCase:
         mock_build_graph,
         mock_graph_repo,
     ):
-        mock_graph_repo.obtener_contribuyente.return_value = {"nit": "123"}
+        mock_graph_repo.obtener_contribuyente.return_value = {"contribuyente_nit": "123"}
         mock_graph_repo.obtener_relacionados.return_value = []
-        mock_build_graph.return_value = _mock_cm(nit="123", edges=[])
-        mock_graph_dict.return_value = {"nit": "123", "nodes": [], "edges": []}
+        mock_build_graph.return_value = _mock_cm(contribuyente_nit="123", edges=[])
+        mock_graph_dict.return_value = {"contribuyente_nit": "123", "nodes": [], "edges": []}
         mock_riesgo.return_value = {"score_red": 80.0, "bonus_red": 5}
 
         mock_comp_uc = MagicMock()
@@ -287,12 +285,12 @@ class TestAnalizarGrafoRiesgoUseCase:
             graph_repo=mock_graph_repo,
             comportamiento_use_case=mock_comp_uc,
         )
-        result = await uc.analizar_nit(nit="123", periodo="2024")
+        result = await uc.analizar_nit(contribuyente_nit="123", periodo="2024")
         assert result["periodo"] == "2024"
         assert result["resumen_red"]["score_red"] == 80.0
         assert result["analisis_comportamental"]["score_comportamental"] == 75.0
         mock_comp_uc.analizar_nit.assert_awaited_once_with(
-            nit="123", periodo="2024", min_pares=10,
+            contribuyente_nit="123", periodo="2024", min_pares=10,
         )
 
     @patch("application.use_cases.analizar_grafo_riesgo.build_taxpayer_graph")
@@ -305,10 +303,10 @@ class TestAnalizarGrafoRiesgoUseCase:
         mock_build_graph,
         mock_graph_repo,
     ):
-        mock_graph_repo.obtener_contribuyente.return_value = {"nit": "123"}
+        mock_graph_repo.obtener_contribuyente.return_value = {"contribuyente_nit": "123"}
         mock_graph_repo.obtener_relacionados.return_value = []
-        mock_build_graph.return_value = _mock_cm(nit="123", edges=[])
-        mock_graph_dict.return_value = {"nit": "123", "nodes": [], "edges": []}
+        mock_build_graph.return_value = _mock_cm(contribuyente_nit="123", edges=[])
+        mock_graph_dict.return_value = {"contribuyente_nit": "123", "nodes": [], "edges": []}
         mock_riesgo.return_value = {"score_red": 50.0, "bonus_red": 0}
 
         uc = AnalizarGrafoRiesgoUseCase(
@@ -316,7 +314,7 @@ class TestAnalizarGrafoRiesgoUseCase:
         )
         uc.comportamiento_use_case.analizar_nit = AsyncMock()
         result = await uc.analizar_nit(
-            nit="123", periodo="2024", incluir_comportamiento=False,
+            contribuyente_nit="123", periodo="2024", incluir_comportamiento=False,
         )
         assert result["analisis_comportamental"] is None
         uc.comportamiento_use_case.analizar_nit.assert_not_awaited()
@@ -325,7 +323,7 @@ class TestAnalizarGrafoRiesgoUseCase:
         mock_graph_repo.obtener_contribuyente.return_value = None
         uc = AnalizarGrafoRiesgoUseCase(graph_repo=mock_graph_repo)
         with pytest.raises(NITNoEncontradoError):
-            await uc.analizar_nit(nit="999", periodo="2024")
+            await uc.analizar_nit(contribuyente_nit="999", periodo="2024")
 
     @patch("application.use_cases.analizar_grafo_riesgo.build_taxpayer_graph")
     @patch("application.use_cases.analizar_grafo_riesgo.graph_to_dict")
@@ -337,16 +335,16 @@ class TestAnalizarGrafoRiesgoUseCase:
         mock_build_graph,
         mock_graph_repo,
     ):
-        mock_graph_repo.obtener_contribuyente.return_value = {"nit": "123"}
+        mock_graph_repo.obtener_contribuyente.return_value = {"contribuyente_nit": "123"}
         mock_graph_repo.obtener_relacionados.return_value = []
-        mock_build_graph.return_value = _mock_cm(nit="123", edges=[])
-        mock_graph_dict.return_value = {"nit": "123"}
+        mock_build_graph.return_value = _mock_cm(contribuyente_nit="123", edges=[])
+        mock_graph_dict.return_value = {"contribuyente_nit": "123"}
         mock_riesgo.return_value = {"score_red": 0.0, "bonus_red": 0}
 
         uc = AnalizarGrafoRiesgoUseCase(graph_repo=mock_graph_repo)
         uc.comportamiento_use_case.analizar_nit = AsyncMock()
         result = await uc.analizar_nit(
-            nit="123", periodo="2024", incluir_comportamiento=False,
+            contribuyente_nit="123", periodo="2024", incluir_comportamiento=False,
         )
         assert result["analisis_comportamental"] is None
         assert result["resumen_red"]["score_red"] == 0.0
@@ -362,40 +360,40 @@ class TestAplicarReglasFiscalesUseCase:
     @patch("application.use_cases.aplicar_reglas_fiscales.evaluar_reglas")
     async def test_evaluar(self, mock_evaluar):
         mock_evaluar.return_value = [
-            {"regla": "R1", "nit": "123", "periodo": "2024", "tipo_hallazgo": "OMISO"},
+            {"regla": "R1", "contribuyente_nit": "123", "periodo": "2024", "tipo_hallazgo": "OMISO"},
         ]
         uc = AplicarReglasFiscalesUseCase()
-        result = await uc.evaluar({"nit": "123"})
+        result = await uc.evaluar({"contribuyente_nit": "123"})
         assert len(result) == 1
         assert result[0]["regla"] == "R1"
 
     @patch("application.use_cases.aplicar_reglas_fiscales.evaluar_reglas")
     async def test_evaluar_con_reglas_especificas(self, mock_evaluar):
-        mock_evaluar.return_value = [{"regla": "R3", "nit": "123"}]
+        mock_evaluar.return_value = [{"regla": "R3", "contribuyente_nit": "123"}]
         uc = AplicarReglasFiscalesUseCase()
-        result = await uc.evaluar({"nit": "123"}, reglas=["R3", "R5"])
-        mock_evaluar.assert_called_once_with({"nit": "123"}, reglas=["R3", "R5"])
+        result = await uc.evaluar({"contribuyente_nit": "123"}, reglas=["R3", "R5"])
+        mock_evaluar.assert_called_once_with({"contribuyente_nit": "123"}, reglas=["R3", "R5"])
 
     @patch("application.use_cases.aplicar_reglas_fiscales.evaluar_reglas")
     async def test_evaluar_vacio(self, mock_evaluar):
         mock_evaluar.return_value = []
         uc = AplicarReglasFiscalesUseCase()
-        result = await uc.evaluar({"nit": "123"})
+        result = await uc.evaluar({"contribuyente_nit": "123"})
         assert result == []
 
     @patch("application.use_cases.aplicar_reglas_fiscales.evaluar_reglas")
     @patch("application.use_cases.aplicar_reglas_fiscales.GestionarHallazgosUseCase.crear_hallazgo", new_callable=AsyncMock)
     async def test_ejecutar(self, mock_crear, mock_evaluar):
         mock_evaluar.return_value = [
-            {"nit": "123", "regla": "R1", "periodo": "2024", "tipo_hallazgo": "OMISO"},
-            {"nit": "123", "regla": "R2", "periodo": "2024", "tipo_hallazgo": "INEXACTO"},
+            {"contribuyente_nit": "123", "regla": "R1", "periodo": "2024", "tipo_hallazgo": "OMISO"},
+            {"contribuyente_nit": "123", "regla": "R2", "periodo": "2024", "tipo_hallazgo": "INEXACTO"},
         ]
         mock_crear.side_effect = [
             {"id": 1},
             {"id": 2},
         ]
         uc = AplicarReglasFiscalesUseCase()
-        result = await uc.ejecutar({"nit": "123", "periodo": "2024"})
+        result = await uc.ejecutar({"contribuyente_nit": "123", "periodo": "2024"})
         assert len(result) == 2
         assert result[0]["id"] == 1
         assert result[1]["id"] == 2
@@ -405,7 +403,7 @@ class TestAplicarReglasFiscalesUseCase:
     async def test_ejecutar_vacio(self, mock_crear, mock_evaluar):
         mock_evaluar.return_value = []
         uc = AplicarReglasFiscalesUseCase()
-        result = await uc.ejecutar({"nit": "123"})
+        result = await uc.ejecutar({"contribuyente_nit": "123"})
         assert result == []
         mock_crear.assert_not_awaited()
 
@@ -419,7 +417,7 @@ class TestConstruirPerfilFiscal:
 
     def test_perfil_completo(self):
         datos = {
-            "nit": "9003189639",
+            "contribuyente_nit": "9003189639",
             "razon_social": "EMPRESA TEST SAS",
             "ciiu": "4711",
             "regimen": "COMUN",
@@ -443,7 +441,7 @@ class TestConstruirPerfilFiscal:
             ],
         }
         perfil = construir_perfil_fiscal_desde_datos_originales(datos, periodo="2024")
-        assert perfil["nit"] == "9003189639"
+        assert perfil["contribuyente_nit"] == "9003189639"
         assert perfil["razon_social"] == "EMPRESA TEST SAS"
         assert perfil["ciiu"] == "4711"
         assert perfil["regimen"] == "COMUN"
@@ -460,7 +458,7 @@ class TestConstruirPerfilFiscal:
 
     def test_perfil_vacio(self):
         perfil = construir_perfil_fiscal_desde_datos_originales({}, periodo="2024")
-        assert perfil["nit"] == ""
+        assert perfil["contribuyente_nit"] == ""
         assert perfil["declaraciones_ica"] == []
         assert perfil["exogena_dian"] == []
         assert perfil["senales_actividad"] == []
@@ -532,26 +530,26 @@ class TestGenerarExpedienteFiscalUseCase:
     @patch("application.use_cases.generar_expediente_fiscal.expediente_to_markdown")
     async def test_generar(self, mock_md, mock_exp, mock_graph_repo):
         grafo_result = {
-            "nit": "123",
+            "contribuyente_nit": "123",
             "periodo": "2024",
         }
         mock_expediente_uc = MagicMock()
         mock_expediente_uc.analizar_nit = AsyncMock(return_value=grafo_result)
 
         mock_exp.return_value = {
-            "nit": "123",
+            "contribuyente_nit": "123",
             "periodo": "2024",
             "score": {"score_fiscal_unificado": 85},
         }
         mock_md.return_value = "# Markdown"
 
         uc = GenerarExpedienteFiscalUseCase(grafo_use_case=mock_expediente_uc)
-        result = await uc.generar(nit="123", periodo="2024")
-        assert result["nit"] == "123"
+        result = await uc.generar(contribuyente_nit="123", periodo="2024")
+        assert result["contribuyente_nit"] == "123"
         assert result["periodo"] == "2024"
         assert result["markdown"] == "# Markdown"
         mock_expediente_uc.analizar_nit.assert_awaited_once_with(
-            nit="123", periodo="2024", min_pares=10, incluir_comportamiento=True,
+            contribuyente_nit="123", periodo="2024", min_pares=10, incluir_comportamiento=True,
         )
         mock_exp.assert_called_once_with(grafo_result)
         mock_md.assert_called_once_with(mock_exp.return_value)
@@ -567,11 +565,11 @@ class TestGenerarExpedienteFiscalUseCase:
         mock_expediente_uc = MagicMock()
         mock_expediente_uc.analizar_nit = AsyncMock(return_value={})
 
-        mock_exp.return_value = {"nit": "", "periodo": "", "score": {}}
+        mock_exp.return_value = {"contribuyente_nit": "", "periodo": "", "score": {}}
         mock_md.return_value = "# Markdown"
 
         uc = GenerarExpedienteFiscalUseCase(grafo_use_case=mock_expediente_uc)
-        result = await uc.generar(nit="999", periodo="2024")
+        result = await uc.generar(contribuyente_nit="999", periodo="2024")
 
         assert result["markdown"] == "# Markdown"
 
@@ -590,17 +588,17 @@ class TestGestionarHallazgosUseCase:
         new_callable=AsyncMock,
     )
     async def test_crear_hallazgo_minimo(self, mock_create):
-        mock_create.return_value = {"id": 1, "nit": "123", "regla": "R8"}
+        mock_create.return_value = {"id": 1, "contribuyente_nit": "123", "regla": "R8"}
         uc = GestionarHallazgosUseCase()
         result = await uc.crear_hallazgo({
-            "nit": "123",
+            "contribuyente_nit": "123",
             "regla": "R8",
             "periodo": "2024",
         })
         assert result["id"] == 1
         mock_create.assert_awaited_once()
         data = mock_create.call_args[0][0]
-        assert data["nit"] == "123"
+        assert data["contribuyente_nit"] == "123"
         assert data["regla"] == "R8"
         assert data["tipo_hallazgo"] == "INEXACTO"
         assert data["fuerza_probatoria"] == "INDICIARIA"
@@ -618,7 +616,7 @@ class TestGestionarHallazgosUseCase:
         mock_create.return_value = {"id": 42}
         uc = GestionarHallazgosUseCase()
         result = await uc.crear_hallazgo({
-            "nit": "9003189639",
+            "contribuyente_nit": "9003189639",
             "regla": "R3",
             "periodo": "2024",
             "tipo_hallazgo": "INEXACTO",
@@ -635,7 +633,7 @@ class TestGestionarHallazgosUseCase:
         })
         assert result["id"] == 42
         data, evidencias = mock_create.call_args[0]
-        assert data["nit"] == "9003189639"
+        assert data["contribuyente_nit"] == "9003189639"
         assert data["regla"] == "R3"
         assert data["tipo_hallazgo"] == "INEXACTO"
         assert data["fuerza_probatoria"] == "DIRECTA"
@@ -648,7 +646,7 @@ class TestGestionarHallazgosUseCase:
         uc = GestionarHallazgosUseCase()
         with pytest.raises(SolicitudInvalidaError) as exc:
             await uc.crear_hallazgo({
-                "nit": "123",
+                "contribuyente_nit": "123",
                 "regla": "R99",
                 "periodo": "2024",
             })
@@ -658,7 +656,7 @@ class TestGestionarHallazgosUseCase:
         uc = GestionarHallazgosUseCase()
         with pytest.raises(KeyError):
             await uc.crear_hallazgo({
-                "nit": "123",
+                "contribuyente_nit": "123",
                 "periodo": "2024",
             })
 
@@ -670,7 +668,7 @@ class TestGestionarHallazgosUseCase:
         mock_create.return_value = {"id": 10}
         uc = GestionarHallazgosUseCase()
         await uc.crear_hallazgo({
-            "nit": "123",
+            "contribuyente_nit": "123",
             "regla": "R2",
             "periodo": "2024",
         })
@@ -686,7 +684,7 @@ class TestGestionarHallazgosUseCase:
         mock_create.return_value = {"id": 11}
         uc = GestionarHallazgosUseCase()
         await uc.crear_hallazgo({
-            "nit": "123",
+            "contribuyente_nit": "123",
             "regla": "R8",
             "periodo": "2015",
         })
@@ -713,11 +711,11 @@ class TestGestionarHallazgosUseCase:
         }
         uc = GestionarHallazgosUseCase()
         uc.crear_hallazgo = AsyncMock(return_value={"id": 99})
-        result = await uc.crear_desde_grafo(nit="123", periodo="2024")
+        result = await uc.crear_desde_grafo(contribuyente_nit="123", periodo="2024")
         assert result["id"] == 99
         uc.crear_hallazgo.assert_awaited_once()
         payload = uc.crear_hallazgo.call_args[0][0]
-        assert payload["nit"] == "123"
+        assert payload["contribuyente_nit"] == "123"
         assert payload["regla"] == "R8"
         assert payload["tipo_hallazgo"] == "INEXACTO_INDICIARIO"
         assert payload["brecha_valor"] == 50000
@@ -739,7 +737,7 @@ class TestGestionarHallazgosUseCase:
         }
         uc = GestionarHallazgosUseCase()
         uc.crear_hallazgo = AsyncMock(return_value={"id": 100})
-        await uc.crear_desde_grafo(nit="456", periodo="2024")
+        await uc.crear_desde_grafo(contribuyente_nit="456", periodo="2024")
         payload = uc.crear_hallazgo.call_args[0][0]
         assert payload["brecha_valor"] == 0
         assert payload["corroboracion"] == 1
@@ -752,7 +750,7 @@ class TestGestionarHallazgosUseCase:
     )
     async def test_obtener(self, mock_obtener):
         hid = uuid.uuid4()
-        mock_obtener.return_value = {"id": hid, "nit": "123"}
+        mock_obtener.return_value = {"id": hid, "contribuyente_nit": "123"}
         uc = GestionarHallazgosUseCase()
         result = await uc.obtener(hid)
         assert result["id"] == hid
@@ -798,8 +796,8 @@ class TestGestionarHallazgosUseCase:
     )
     async def test_listar_con_filtros(self, mock_listar):
         uc = GestionarHallazgosUseCase()
-        await uc.listar(estado="DETECTADO", nit="123")
-        mock_listar.assert_awaited_once_with(estado="DETECTADO", nit="123")
+        await uc.listar(estado="DETECTADO", contribuyente_nit="123")
+        mock_listar.assert_awaited_once_with(estado="DETECTADO", contribuyente_nit="123")
 
     # ── revisar ──
 
@@ -834,7 +832,7 @@ class TestGestionarHallazgosUseCase:
 def _hallazgo_ejemplo() -> dict:
     return {
         "id": uuid.uuid4(),
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "regla": "R8",
         "periodo": "2024",
         "tipo_hallazgo": "INEXACTO",
@@ -1006,7 +1004,7 @@ class TestCompactarHallazgo:
     def test_compactar_completo(self):
         evidencias = [{"id": i, "fuente": "MCP"} for i in range(10)]
         hallazgo = {
-            "nit": "123",
+            "contribuyente_nit": "123",
             "regla": "R1",
             "periodo": "2024",
             "tipo_hallazgo": "OMISO",
@@ -1020,7 +1018,7 @@ class TestCompactarHallazgo:
             "evidencias": evidencias,
         }
         comp = _compactar_hallazgo(hallazgo)
-        assert comp["nit"] == "123"
+        assert comp["contribuyente_nit"] == "123"
         assert comp["regla"] == "R1"
         assert comp["score"] == 90.0
         assert comp["accionable"] is True
@@ -1028,13 +1026,13 @@ class TestCompactarHallazgo:
 
     def test_compactar_minimo(self):
         comp = _compactar_hallazgo({})
-        assert comp["nit"] is None
+        assert comp["contribuyente_nit"] is None
         assert comp["regla"] is None
         assert comp["evidencias"] == []
 
     def test_compactar_sin_evidencias(self):
-        comp = _compactar_hallazgo({"nit": "123"})
-        assert comp["nit"] == "123"
+        comp = _compactar_hallazgo({"contribuyente_nit": "123"})
+        assert comp["contribuyente_nit"] == "123"
         assert comp["evidencias"] == []
 
     def test_compactar_pocas_evidencias(self):

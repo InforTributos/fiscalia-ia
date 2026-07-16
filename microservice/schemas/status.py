@@ -33,7 +33,7 @@ class ClasificacionProgreso(BaseModel):
 class StatusResponse(BaseModel):
     proceso_id: UUID
     estado: str
-    cliente_nit: str
+    entidad_nit: str
     intento_actual: IntentoActual | None = None
     intentos_historial: list[IntentoHistorial] = []
     progreso: Progreso | None = None

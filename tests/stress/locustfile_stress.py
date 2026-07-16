@@ -28,7 +28,7 @@ SEED_NITS = [
 ]
 
 PROCESO_PAYLOAD = {
-    "cliente_nit": "800098911-8",
+    "entidad_nit": "800098911-8",
     "nombre": "Stress Test Proceso",
     "vigencia_ini": "2024-01-01",
     "vigencia_fin": "2024-12-31",

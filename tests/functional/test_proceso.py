@@ -13,7 +13,7 @@ def test_create_proceso_body(client, proceso_payload):
     body = resp.json()
     assert "intento_id" in body
     assert "created_at" in body
-    assert body["cliente_nit"] == proceso_payload["cliente_nit"]
+    assert body["entidad_nit"] == proceso_payload["entidad_nit"]
     assert body["proceso_id"] is not None
 
 

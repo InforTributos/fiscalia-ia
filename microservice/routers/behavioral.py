@@ -18,9 +18,9 @@ from schemas.behavioral import (
 router = APIRouter()
 
 
-@router.get("/contribuyente/{nit}/comportamiento", response_model=ComportamientoResponse)
+@router.get("/contribuyente/{contribuyente_nit}/comportamiento", response_model=ComportamientoResponse)
 async def analizar_comportamiento_contribuyente(
-    nit: str,
+    contribuyente_nit: str,
     periodo: str = "2024",
     ciiu: str | None = None,
     regimen: str | None = None,
@@ -28,7 +28,7 @@ async def analizar_comportamiento_contribuyente(
 ):
     use_case = AnalizarComportamientoUseCase()
     return await use_case.analizar_nit(
-        nit=nit,
+        contribuyente_nit=contribuyente_nit,
         periodo=periodo,
         ciiu=ciiu,
         regimen=regimen,
@@ -54,35 +54,35 @@ async def ranking_comportamental_proceso(
     )
 
 
-@router.get("/contribuyente/{nit}/grafo-riesgo", response_model=GrafoRiesgoResponse)
+@router.get("/contribuyente/{contribuyente_nit}/grafo-riesgo", response_model=GrafoRiesgoResponse)
 async def analizar_grafo_riesgo_contribuyente(
-    nit: str,
+    contribuyente_nit: str,
     periodo: str = "2024",
     min_pares: int = Query(10, ge=3, le=100),
     incluir_comportamiento: bool = True,
 ):
     use_case = AnalizarGrafoRiesgoUseCase()
     return await use_case.analizar_nit(
-        nit=nit,
+        contribuyente_nit=contribuyente_nit,
         periodo=periodo,
         min_pares=min_pares,
         incluir_comportamiento=incluir_comportamiento,
     )
 
 
-@router.get("/contribuyente/{nit}/expediente-fiscal", response_model=ExpedienteFiscalResponse)
+@router.get("/contribuyente/{contribuyente_nit}/expediente-fiscal", response_model=ExpedienteFiscalResponse)
 async def generar_expediente_fiscal(
-    nit: str,
+    contribuyente_nit: str,
     periodo: str = "2024",
     min_pares: int = Query(10, ge=3, le=100),
 ):
     use_case = GenerarExpedienteFiscalUseCase()
-    return await use_case.generar(nit=nit, periodo=periodo, min_pares=min_pares)
+    return await use_case.generar(contribuyente_nit=contribuyente_nit, periodo=periodo, min_pares=min_pares)
 
 
-@router.get("/visor/grafo/{nit}", response_class=HTMLResponse)
+@router.get("/visor/grafo/{contribuyente_nit}", response_class=HTMLResponse)
 async def visor_grafo_riesgo(
-    nit: str,
+    contribuyente_nit: str,
     periodo: str = "2024",
 ):
-    return HTMLResponse(render_graph_viewer(nit=nit, periodo=periodo))
+    return HTMLResponse(render_graph_viewer(nit=contribuyente_nit, periodo=periodo))

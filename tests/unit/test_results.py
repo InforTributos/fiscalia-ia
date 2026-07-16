@@ -12,7 +12,7 @@ def test_results_retorna_200(mock_listar, mock_proceso):
     mock_proceso.return_value = {"id": "550e8400-e29b-41d4-a716-446655440000", "estado": "COMPLETADO", "candidatos": 5}
     mock_listar.return_value = (2, [
         {
-            "nit": "9003189639",
+            "contribuyente_nit": "9003189639",
             "razon_social": "COMERCIO XYZ S.A.S.",
             "ciiu": "4711",
             "clasificacion": "INEXACTO",
@@ -24,7 +24,7 @@ def test_results_retorna_200(mock_listar, mock_proceso):
             "explicacion_ia": "Análisis completo",
         },
         {
-            "nit": "9003189640",
+            "contribuyente_nit": "9003189640",
             "razon_social": "OTRO COMERCIO S.A.S.",
             "ciiu": "5611",
             "clasificacion": "OMISO",
@@ -44,7 +44,7 @@ def test_results_retorna_200(mock_listar, mock_proceso):
     assert data["parcial"] is False
     assert data["paginacion"]["total_registros"] == 2
     assert len(data["resultados"]) == 2
-    assert data["resultados"][0]["nit"] == "9003189639"
+    assert data["resultados"][0]["contribuyente_nit"] == "9003189639"
 
 
 @patch("infrastructure.persistence.queries.obtener_proceso")
@@ -53,7 +53,7 @@ def test_results_filtro_clasificacion(mock_listar, mock_proceso):
     mock_proceso.return_value = {"id": "550e8400-e29b-41d4-a716-446655440000", "estado": "COMPLETADO", "candidatos": 5}
     mock_listar.return_value = (1, [
         {
-            "nit": "9003189640",
+            "contribuyente_nit": "9003189640",
             "razon_social": "OTRO COMERCIO S.A.S.",
             "ciiu": "5611",
             "clasificacion": "OMISO",

@@ -20,7 +20,7 @@ def construir_perfil_fiscal_desde_datos_originales(
         })
 
     perfil = {
-        "nit": datos.get("nit", ""),
+        "contribuyente_nit": datos.get("contribuyente_nit", ""),
         "periodo": periodo,
         "reglas": reglas,
         "razon_social": datos.get("razon_social", ""),

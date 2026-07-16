@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class MetricasContribuyente(BaseModel):
-    nit: str
+    contribuyente_nit: str
     razon_social: str = ""
     ciiu: str = ""
     regimen: str = ""
@@ -45,7 +45,7 @@ class HallazgoComportamental(BaseModel):
 
 
 class ComportamientoResponse(BaseModel):
-    nit: str
+    contribuyente_nit: str
     razon_social: str
     ciiu: str
     regimen: str
@@ -61,7 +61,7 @@ class ComportamientoResponse(BaseModel):
 
 
 class RankingError(BaseModel):
-    nit: str
+    contribuyente_nit: str
     mensaje: str
 
 
@@ -99,7 +99,7 @@ class ResumenRiesgoRed(BaseModel):
 
 
 class GrafoRiesgoResponse(BaseModel):
-    nit: str
+    contribuyente_nit: str
     periodo: str
     nodes: list[GraphNodeResponse]
     edges: list[GraphEdgeResponse]
@@ -115,7 +115,7 @@ class ScoreFiscalUnificado(BaseModel):
 
 
 class ExpedienteFiscalResponse(BaseModel):
-    nit: str
+    contribuyente_nit: str
     periodo: str
     generado_en: str
     score: ScoreFiscalUnificado

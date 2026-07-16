@@ -154,7 +154,7 @@ def calcular_score_comportamental(
 
     score = min(round(score, 2), 100.0)
     return {
-        "nit": contribuyente.nit,
+        "contribuyente_nit": contribuyente.contribuyente_nit,
         "razon_social": contribuyente.razon_social,
         "ciiu": contribuyente.ciiu,
         "regimen": contribuyente.regimen,

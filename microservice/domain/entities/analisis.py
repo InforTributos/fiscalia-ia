@@ -8,7 +8,7 @@ from domain.value_objects.score_riesgo import ScoreRiesgo
 
 @dataclass
 class Analisis:
-    nit: NIT
+    contribuyente_nit: NIT
     periodo: Periodo
     score: ScoreRiesgo
     hallazgos: list[Hallazgo]

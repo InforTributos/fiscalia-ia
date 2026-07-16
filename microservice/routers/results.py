@@ -58,7 +58,7 @@ async def consultar_resultados(
                 hallazgos.append(HallazgoResult(tipo=str(h)))
 
         resultados.append(ResultadoDetalle(
-            nit=r["nit"],
+            contribuyente_nit=r["contribuyente_nit"],
             razon_social=r.get("razon_social"),
             ciiu=r.get("ciiu"),
             clasificacion=r["clasificacion"],

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 class ContribuyenteRepo(ABC):
     @abstractmethod
-    async def obtener_por_nit(self, nit: str, periodo: str) -> dict | None:
+    async def obtener_por_nit(self, contribuyente_nit: str, periodo: str) -> dict | None:
         ...
 
     @abstractmethod

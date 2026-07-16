@@ -6,6 +6,21 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PAGE_SIZE = 100
 
+
+def _count_wrapper(sql: str) -> str:
+    """Envuelve un SELECT paginado en SELECT COUNT(*) sin OFFSET/FETCH."""
+    base = sql.replace("OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY", "")
+    return f"SELECT COUNT(*) AS cnt FROM ({base}) sub"
+
+
+def calcular_page_size_dinamico(total: int) -> int:
+    """Calcula page_size óptimo para Oracle según total estimado de filas."""
+    if total <= 0:
+        return DEFAULT_PAGE_SIZE
+    if total < DEFAULT_PAGE_SIZE:
+        return total
+    return DEFAULT_PAGE_SIZE
+
 # ID numérico del impuesto ICA en DF_C_IMPUESTOS
 ID_IMPSTO_ICA = 102
 
@@ -115,10 +130,10 @@ async def paginar_contribuyentes(
     logger.info("Paginacion completada — %d contribuyentes obtenidos", total_obtenidos)
 
 
-async def obtener_datos_fiscales(client: OracleClient, nit: str, periodo: str) -> dict | None:
-    logger.info("Oracle: solicitando datos fiscales para NIT %s periodo %s", nit, periodo)
+async def obtener_datos_fiscales(client: OracleClient, contribuyente_nit: str, periodo: str) -> dict | None:
+    logger.info("Oracle: solicitando datos fiscales para NIT %s periodo %s", contribuyente_nit, periodo)
 
-    contribuyente = await client.execute_sql(OBTENER_CONTRIBUYENTE_SQL, {"nit": nit})
+    contribuyente = await client.execute_sql(OBTENER_CONTRIBUYENTE_SQL, {"nit": contribuyente_nit})
 
     if not contribuyente:
         return None
@@ -133,10 +148,10 @@ async def obtener_datos_fiscales(client: OracleClient, nit: str, periodo: str) -
             OBTENER_DECLARACIONES_SQL,
             {"id_sjto_impsto": id_sjto_impsto, "periodo": periodo},
         )
-        exogena = await client.execute_sql(OBTENER_EXOGENA_SQL, {"nit": nit, "periodo": periodo})
+        exogena = await client.execute_sql(OBTENER_EXOGENA_SQL, {"nit": contribuyente_nit, "periodo": periodo})
 
     return {
-        "nit": row.get("nit", nit),
+        "contribuyente_nit": row.get("nit", contribuyente_nit),
         "razon_social": row.get("razon_social", ""),
         "ciiu": str(row.get("ciiu", "") or ""),
         "regimen": row.get("regimen", ""),
@@ -411,3 +426,64 @@ async def obtener_inexactos_retenciones(
         offset_val += size
 
     logger.info("Inexactos retenciones: %d candidatos obtenidos", total)
+
+
+async def contar_omisos_conocidos(client: OracleClient, vigencia, periodo) -> int:
+    sql = _count_wrapper(OMISOS_CONOCIDOS_SQL.format(payment_filter=""))
+    params = {
+        "id_impsto_ica": ID_IMPSTO_ICA,
+        "id_prgrma_omisos": ID_PRGRMA_OMISOS,
+        "vigencia": vigencia,
+        "fin_periodo": f"{vigencia}-12-31",
+    }
+    result = await client.execute_sql(sql, params)
+    if not result:
+        return 0
+    row = result[0] if isinstance(result, list) else result
+    return row.get("cnt", 0) or 0
+
+
+async def contar_omisos_desconocidos(client: OracleClient, vigencia) -> int:
+    sql = _count_wrapper(OMISOS_DESCONOCIDOS_DIAN_SQL)
+    params = {
+        "id_prgrma_omisos": ID_PRGRMA_OMISOS,
+        "vigencia": vigencia,
+    }
+    result = await client.execute_sql(sql, params)
+    if not result:
+        return 0
+    row = result[0] if isinstance(result, list) else result
+    return row.get("cnt", 0) or 0
+
+
+async def contar_inexactos_ciiu(client: OracleClient, periodo) -> int:
+    sql = _count_wrapper(INEXACTOS_CIIU_SQL.format(
+        ciiu_ids=CIIU_IDS, tarifa_ids=TARIFA_IDS, payment_filter="",
+    ))
+    params = {
+        "id_prgrma_inexactos": ID_PRGRMA_INEXACTOS,
+        "vigencia": periodo,
+    }
+    result = await client.execute_sql(sql, params)
+    if not result:
+        return 0
+    row = result[0] if isinstance(result, list) else result
+    return row.get("cnt", 0) or 0
+
+
+async def contar_inexactos_retenciones(client: OracleClient, periodo, umbral_pct=None) -> int:
+    sql = _count_wrapper(INEXACTOS_RETENCIONES_SQL.format(
+        ret_recibidas_ids=RET_RECIBIDAS_IDS,
+        ret_practicadas_ids=RET_PRACTICADAS_IDS,
+        payment_filter="",
+    ))
+    umbral = (umbral_pct or 5.0) / 100.0
+    params = {
+        "vigencia": periodo,
+        "umbral": umbral,
+    }
+    result = await client.execute_sql(sql, params)
+    if not result:
+        return 0
+    row = result[0] if isinstance(result, list) else result
+    return row.get("cnt", 0) or 0

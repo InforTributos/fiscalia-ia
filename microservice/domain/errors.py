@@ -13,8 +13,8 @@ class NITNoEncontradoError(FiscalIAError):
     codigo = "NIT_NO_ENCONTRADO"
     status_code = 404
 
-    def __init__(self, nit: str):
-        super().__init__(f"El NIT {nit} no fue encontrado en el padrón de contribuyentes")
+    def __init__(self, contribuyente_nit: str):
+        super().__init__(f"El NIT {contribuyente_nit} no fue encontrado en el padrón de contribuyentes")
 
 
 class ProcesoNoEncontradoError(FiscalIAError):
@@ -25,12 +25,12 @@ class ProcesoNoEncontradoError(FiscalIAError):
         super().__init__(f"El proceso {proceso_id} no fue encontrado")
 
 
-class ClienteNoEncontradoError(FiscalIAError):
-    codigo = "CLIENTE_NO_ENCONTRADO"
+class EntidadNoEncontradoError(FiscalIAError):
+    codigo = "ENTIDAD_NO_ENCONTRADA"
     status_code = 404
 
-    def __init__(self, nit: str):
-        super().__init__(f"El cliente con NIT {nit} no está registrado")
+    def __init__(self, entidad_nit: str):
+        super().__init__(f"La entidad fiscalizadora con NIT {entidad_nit} no está registrada")
 
 
 class ProcesoEnProcesoError(FiscalIAError):

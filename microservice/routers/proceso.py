@@ -2,7 +2,7 @@ import asyncio
 import logging
 import uuid
 
-from domain.errors import FiscalIAError, ProcesoEnProcesoError
+from domain.errors import EntidadNoEncontradoError, FiscalIAError, ProcesoEnProcesoError
 from fastapi import APIRouter
 from infrastructure.persistence.repositorio_proceso import PostgresProcesoRepo
 from schemas.proceso import ProcesoAnalisis, ProcesoRequest, ProcesoResponse, ProcesoResumen
@@ -35,13 +35,10 @@ async def _lanzar_analisis(proceso_id: uuid.UUID, intento_id: int, criteria: dic
 
 @router.post("/proceso", status_code=201, response_model=ProcesoResponse)
 async def crear_proceso(req: ProcesoRequest):
-    cliente = await repo.obtener_cliente_por_nit(req.cliente_nit)
-    if not cliente:
-        cliente_id = await repo.crear_cliente(req.cliente_nit, req.cliente_nit)
-        if not cliente_id:
-            raise FiscalIAError("No se pudo crear el cliente")
-    else:
-        cliente_id = cliente["id"]
+    entidad = await repo.obtener_entidad_por_nit(req.entidad_nit)
+    if not entidad:
+        raise EntidadNoEncontradoError(req.entidad_nit)
+    entidad_id = entidad["id"]
 
     criteria = {
         "vigencia_ini": req.vigencia_ini,
@@ -49,9 +46,12 @@ async def crear_proceso(req: ProcesoRequest):
         "tipo_regimen": req.tipo_regimen,
         "actividades_economicas": req.actividades_economicas,
         "periodo": req.periodo,
+        "tipo": req.tipo,
+        "max_nits": req.max_nits,
+        "umbral_retenciones_pct": req.umbral_retenciones_pct,
     }
 
-    existing = await repo.obtener_proceso_por_criteria(cliente_id, criteria)
+    existing = await repo.obtener_proceso_por_criteria(entidad_id, criteria)
     if existing and existing["estado"] in ("EN_PROCESO", "EN_COLA", "PREFILTRANDO", "PENDIENTE"):
         raise ProcesoEnProcesoError(
             str(existing["id"]),
@@ -62,7 +62,7 @@ async def crear_proceso(req: ProcesoRequest):
     if existing and existing["estado"] in ("COMPLETADO", "ERROR", "INTERRUMPIDO"):
         numero_intento = (existing.get("intentos_total") or 0) + 1
 
-    proceso_id = await repo.crear_proceso(cliente_id, req.nombre, criteria)
+    proceso_id = await repo.crear_proceso(entidad_id, req.nombre, criteria)
     if not proceso_id:
         raise FiscalIAError("No se pudo crear el proceso")
 
@@ -80,7 +80,7 @@ async def crear_proceso(req: ProcesoRequest):
         intento_id=intento_id,
         estado="EN_COLA",
         nombre=req.nombre,
-        cliente_nit=req.cliente_nit,
+        entidad_nit=req.entidad_nit,
         resumen=ProcesoResumen(),
         proceso_analisis=ProcesoAnalisis(
             estado="EN_COLA",

@@ -2,9 +2,9 @@ from domain.behavioral.behavioral_score import calcular_score_comportamental
 from domain.behavioral.peer_group import ContributorMetrics, PeerBenchmark
 
 
-def _make_contributor(nit="123", base=1000):
+def _make_contributor(contribuyente_nit="123", base=1000):
     return ContributorMetrics(
-        nit=nit, razon_social="Test", ciiu="1234", regimen="GENERAL",
+        contribuyente_nit=contribuyente_nit, razon_social="Test", ciiu="1234", regimen="GENERAL",
         vigencia="2024", base_gravable=base, impuesto=100,
         ingresos_exogena=1200, tarifa_efectiva=0.1, ratio_exogena_declarado=1.2,
     )
@@ -12,7 +12,7 @@ def _make_contributor(nit="123", base=1000):
 
 def test_score_bajo_p10():
     contrib = _make_contributor(base=50)
-    peers = [_make_contributor(nit=str(i), base=1000 + i * 100) for i in range(20)]
+    peers = [_make_contributor(contribuyente_nit=str(i), base=1000 + i * 100) for i in range(20)]
     benchmark = PeerBenchmark(
         ciiu="1234", regimen="GENERAL", vigencia="2024", total_pares=20,
         mediana_base_gravable=2500, p10_base_gravable=1000, p25_base_gravable=1500,
@@ -26,7 +26,7 @@ def test_score_bajo_p10():
 
 def test_score_bajo_p25():
     contrib = _make_contributor(base=1200)
-    peers = [_make_contributor(nit=str(i), base=1000 + i * 100) for i in range(20)]
+    peers = [_make_contributor(contribuyente_nit=str(i), base=1000 + i * 100) for i in range(20)]
     benchmark = PeerBenchmark(
         ciiu="1234", regimen="GENERAL", vigencia="2024", total_pares=20,
         mediana_base_gravable=2500, p10_base_gravable=1000, p25_base_gravable=1500,
@@ -40,7 +40,7 @@ def test_score_bajo_p25():
 
 def test_score_bajo_muestra_pequena():
     contrib = _make_contributor(base=50)
-    peers = [_make_contributor(nit=str(i), base=1000 + i * 100) for i in range(5)]
+    peers = [_make_contributor(contribuyente_nit=str(i), base=1000 + i * 100) for i in range(5)]
     benchmark = PeerBenchmark(
         ciiu="1234", regimen="GENERAL", vigencia="2024", total_pares=5,
         mediana_base_gravable=1500, p10_base_gravable=1000, p25_base_gravable=1200,

@@ -72,7 +72,7 @@ class RevisarHallazgoAgenteUseCase:
 
 def _compactar_hallazgo(hallazgo: dict) -> dict:
     return {
-        "nit": hallazgo.get("nit"),
+        "contribuyente_nit": hallazgo.get("contribuyente_nit"),
         "regla": hallazgo.get("regla"),
         "periodo": hallazgo.get("periodo"),
         "tipo_hallazgo": hallazgo.get("tipo_hallazgo"),

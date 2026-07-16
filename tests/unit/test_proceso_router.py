@@ -7,8 +7,7 @@ from main import app
 client = TestClient(app)
 
 
-@patch("routers.proceso.repo.obtener_cliente_por_nit")
-@patch("routers.proceso.repo.crear_cliente")
+@patch("routers.proceso.repo.obtener_entidad_por_nit")
 @patch("routers.proceso.repo.obtener_proceso_por_criteria")
 @patch("routers.proceso.repo.crear_proceso")
 @patch("routers.proceso.repo.crear_intento")
@@ -17,17 +16,16 @@ client = TestClient(app)
 def test_crear_proceso_retorna_201(
     mock_estado_intento, mock_estado_proceso,
     mock_crear_intento, mock_crear_proceso,
-    mock_obtener_criteria, mock_crear_cliente,
-    mock_obtener_cliente,
+    mock_obtener_criteria, mock_obtener_entidad,
 ):
     proc_id = uuid.uuid4()
-    mock_obtener_cliente.return_value = {"id": uuid.uuid4(), "nit": "9003189639"}
+    mock_obtener_entidad.return_value = {"id": uuid.uuid4(), "nit": "800098911-8"}
     mock_obtener_criteria.return_value = None
     mock_crear_proceso.return_value = proc_id
     mock_crear_intento.return_value = 1
 
     response = client.post("/api/v1/proceso", json={
-        "cliente_nit": "9003189639",
+        "entidad_nit": "800098911-8",
         "nombre": "Test proceso",
         "vigencia_ini": "2024-01-01",
         "vigencia_fin": "2024-12-31",

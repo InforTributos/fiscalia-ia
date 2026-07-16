@@ -2,9 +2,9 @@ from domain.fiscal.dossier import construir_expediente_fiscal, expediente_to_mar
 
 
 def test_construir_expediente_minimo():
-    grafo = {"nit": "9003189639", "periodo": "2024"}
+    grafo = {"contribuyente_nit": "9003189639", "periodo": "2024"}
     result = construir_expediente_fiscal(grafo)
-    assert result["nit"] == "9003189639"
+    assert result["contribuyente_nit"] == "9003189639"
     assert result["periodo"] == "2024"
     assert result["score"]["prioridad"] == "BAJA"
     assert result["score"]["score_fiscal_unificado"] == 0.0
@@ -15,7 +15,7 @@ def test_construir_expediente_minimo():
 
 def test_construir_expediente_con_analisis():
     grafo = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "periodo": "2024",
         "analisis_comportamental": {
             "score_comportamental": 100,
@@ -35,7 +35,7 @@ def test_construir_expediente_con_analisis():
 
 def test_construir_expediente_con_hallazgos():
     grafo = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "periodo": "2024",
         "analisis_comportamental": {
             "hallazgos": [
@@ -52,7 +52,7 @@ def test_construir_expediente_con_hallazgos():
 
 def test_construir_expediente_con_hallazgo_exogena():
     grafo = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "periodo": "2024",
         "analisis_comportamental": {
             "hallazgos": [{"tipo": "EXOGENA_SIN_DECLARACION", "descripcion": "Diferencia exogena"}],
@@ -66,7 +66,7 @@ def test_construir_expediente_con_hallazgo_exogena():
 
 def test_construir_expediente_sin_hallazgos():
     grafo = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "periodo": "2024",
         "analisis_comportamental": {"metricas": {}, "benchmark": {}},
         "resumen_red": {},
@@ -78,7 +78,7 @@ def test_construir_expediente_sin_hallazgos():
 
 def test_expediente_to_markdown():
     expediente = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "periodo": "2024",
         "score": {"prioridad": "ALTA", "score_fiscal_unificado": 85.5},
         "resumen_ejecutivo": "Resumen de prueba",
@@ -95,7 +95,7 @@ def test_expediente_to_markdown():
 
 def test_expediente_to_markdown_sin_evidencia():
     expediente = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "periodo": "2024",
         "score": {"prioridad": "BAJA", "score_fiscal_unificado": 10},
         "resumen_ejecutivo": "Sin novedades",
@@ -109,7 +109,7 @@ def test_expediente_to_markdown_sin_evidencia():
 
 def test_resumen_con_evidencia_parcial():
     grafo = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "periodo": "2024",
         "analisis_comportamental": {
             "metricas": {"base_gravable": 100000000},

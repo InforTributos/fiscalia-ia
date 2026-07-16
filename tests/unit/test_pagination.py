@@ -44,7 +44,7 @@ async def test_obtener_datos_fiscales_retorna_dict_completo():
     result = await obtener_datos_fiscales(client, "9003189639", "2024")
 
     assert result is not None
-    assert result["nit"] == "9003189639"
+    assert result["contribuyente_nit"] == "9003189639"
     assert result["razon_social"] == "TEST S.A.S."
     assert result["ciiu"] == "4711"
     assert result["regimen"] == "A"
@@ -77,7 +77,7 @@ async def test_obtener_datos_fiscales_contribuyente_dict_sin_lista():
 
     result = await obtener_datos_fiscales(client, "123", "2024")
     assert result is not None
-    assert result["nit"] == "123"
+    assert result["contribuyente_nit"] == "123"
     assert result["razon_social"] == "SINGLE S.A."
 
 

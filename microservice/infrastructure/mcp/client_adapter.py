@@ -29,8 +29,8 @@ class AGT05MCPClient:
         ):
             yield item
 
-    async def obtener_datos(self, nit: str, periodo: str) -> dict | None:
-        return await obtener_datos_fiscales(self.client, nit, periodo)
+    async def obtener_datos(self, contribuyente_nit: str, periodo: str) -> dict | None:
+        return await obtener_datos_fiscales(self.client, contribuyente_nit, periodo)
 
     async def close(self):
         pass

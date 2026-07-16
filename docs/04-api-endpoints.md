@@ -6,7 +6,7 @@
 
 ```json
 {
-  "cliente_nit": "9003189639",
+  "entidad_nit": "9003189639",
   "nombre": "Proceso Comercio Q1 2024",
   "vigencia_ini": "2024-01-01",
   "vigencia_fin": "2024-12-31",
@@ -24,7 +24,7 @@
   "intento_id": 1,
   "estado": "PREFILTRADO_COMPLETADO",
   "nombre": "Proceso Comercio Q1 2024",
-  "cliente_nit": "9003189639",
+  "entidad_nit": "9003189639",
   "resumen": {
     "total_nits": 8500,
     "omisos": 1200,
@@ -39,13 +39,13 @@
 }
 ```
 
-**Re-lanzamiento:** Si se envía el mismo `cliente_nit` + mismos `criteria`, se detecta como re-lanzamiento y se crea un nuevo `proceso_intentos` con `numero_intento` incremental.
+**Re-lanzamiento:** Si se envía el mismo `entidad_nit` + mismos `criteria`, se detecta como re-lanzamiento y se crea un nuevo `proceso_intentos` con `numero_intento` incremental.
 
 **Lógica de re-lanzamiento:**
 
 | Aspecto | Comportamiento |
 |---|---|
-| Detección | Comparación de `cliente_nit` + hash de `criteria` (JSON deep equality) |
+| Detección | Comparación de `entidad_nit` + hash de `criteria` (JSON deep equality) |
 | Si hay proceso `EN_PROCESO` con mismos criteria | Se rechaza con 409 `PROCESO_EN_PROCESO` |
 | Si hay proceso `COMPLETADO`/`ERROR` con mismos criteria | Se crea nuevo intento con `numero_intento` incremental |
 | Resultados anteriores | Se preservan (historial de intentos) |
@@ -74,7 +74,7 @@ sequenceDiagram
     participant PG as PostgreSQL
     participant LLM as LLM Service
 
-    APEX->>API: POST /proceso (criterios + cliente_nit)
+    APEX->>API: POST /proceso (criterios + entidad_nit)
     API->>PG: INSERT proceso (estado: PENDIENTE)
     API->>PG: INSERT proceso_intentos (intento: 1, estado: EN_PROCESO)
     API->>MCP: call_tool(buscar_contribuyentes, criterios)
@@ -112,7 +112,7 @@ sequenceDiagram
 {
   "proceso_id": "uuid-o-id-12345",
   "estado": "EN_PROCESO",
-  "cliente_nit": "9003189639",
+  "entidad_nit": "9003189639",
   "intento_actual": {
     "numero": 2,
     "estado": "EN_PROCESO",
@@ -201,7 +201,7 @@ stateDiagram-v2
   },
   "resultados": [
     {
-      "nit": "9003189639",
+      "contribuyente_nit": "9003189639",
       "razon_social": "COMERCIO XYZ S.A.S.",
       "ciiu": "4711",
       "clasificacion": "INEXACTO",
@@ -310,7 +310,7 @@ flowchart TD
   ],
   "errores_detalle": [
     {
-      "nit": "9003189639",
+      "contribuyente_nit": "9003189639",
       "capa": "LLM",
       "codigo": "LLM_TIMEOUT",
       "mensaje": "Timeout al analizar contribuyente con LLM (Tier 1: anthropic, Tier 2: nvidia_nim)",
@@ -331,7 +331,7 @@ flowchart TD
 
 ```json
 {
-  "cliente_nit": "9003189639",
+  "entidad_nit": "9003189639",
   "nit_objetivo": "9012345678",
   "periodo": "2024"
 }
@@ -340,14 +340,14 @@ flowchart TD
 | Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
 | `nit_objetivo` | string | Sí | NIT del contribuyente a analizar (path param) |
-| `cliente_nit` | string | Sí | NIT del cliente que solicita (auditor) |
+| `entidad_nit` | string | Sí | NIT de la entidad fiscalizadora |
 | `periodo` | string | No | Año fiscal a analizar (default: año actual) |
 
 **Response (200):**
 
 ```json
 {
-  "nit": "9012345678",
+  "contribuyente_nit": "9012345678",
   "razon_social": "COMERCIO XYZ S.A.S.",
   "ciiu": "4711",
   "clasificacion": "INEXACTO",

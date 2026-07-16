@@ -172,7 +172,7 @@ Pool asyncpg con `min_size=4, max_size=20, timeout=5`. 6 tablas:
 
 | Tabla | Propósito |
 |---|---|
-| `clientes` | Contribuyentes registrados |
+| `entidades_fiscalizadoras` | Contribuyentes registrados |
 | `procesos` | Procesos de fiscalización |
 | `proceso_intentos` | Intentos de ejecución |
 | `proceso_detalle` | Resultados por NIT |
@@ -205,7 +205,7 @@ Response 200:
 |---|---|
 | `procesos`, `proceso_intentos`, `proceso_detalle` | 2 años |
 | `proceso_errores`, `proceso_detalle_errores` | 1 año |
-| `clientes` | Indefinido |
+| `entidades_fiscalizadoras` | Indefinido |
 | Logs | 6 meses (rotate/archive) |
 
 Implementación: PostgreSQL cron job mensual.

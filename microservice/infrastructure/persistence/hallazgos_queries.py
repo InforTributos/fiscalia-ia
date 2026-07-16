@@ -13,17 +13,19 @@ async def crear_hallazgo(data: dict, evidencias: list[dict]) -> dict:
             row = await conn.fetchrow(
                 """
                 INSERT INTO hallazgos_fiscales (
-                    nit, regla, periodo, tipo_hallazgo, fuerza_probatoria,
+                    contribuyente_nit, regla, periodo, tipo_hallazgo, fuerza_probatoria,
                     brecha_valor, impuesto_estimado, score, score_componentes,
-                    ventana_limite, accionable, estado, resumen, metadata
+                    ventana_limite, accionable, estado, resumen, metadata,
+                    proceso_id, entidad_id
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14::jsonb)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14::jsonb, $15, $16)
                 RETURNING *
                 """,
-                data["nit"], data["regla"], data["periodo"], data["tipo_hallazgo"], data["fuerza_probatoria"],
+                data["contribuyente_nit"], data["regla"], data["periodo"], data["tipo_hallazgo"], data["fuerza_probatoria"],
                 data.get("brecha_valor", 0), data.get("impuesto_estimado", 0), data["score"],
                 json.dumps(data.get("score_componentes", {})), data["ventana_limite"], data["accionable"],
                 data.get("estado", "DETECTADO"), data.get("resumen"), json.dumps(data.get("metadata", {})),
+                data.get("proceso_id"), data.get("entidad_id"),
             )
             hallazgo = dict(row)
             for evidencia in evidencias:
@@ -43,7 +45,7 @@ async def crear_hallazgo(data: dict, evidencias: list[dict]) -> dict:
 async def obtener_hallazgo(hallazgo_id: uuid.UUID) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT * FROM hallazgos_fiscales WHERE id = $1", hallazgo_id)
+        row = await conn.fetchrow("SELECT f.* FROM hallazgos_fiscales f WHERE f.id = $1", hallazgo_id)
         if not row:
             return None
         evidencias = await conn.fetch(
@@ -68,8 +70,10 @@ async def obtener_hallazgo(hallazgo_id: uuid.UUID) -> dict | None:
 async def listar_hallazgos(
     estado: str | None = None,
     regla: str | None = None,
-    nit: str | None = None,
+    contribuyente_nit: str | None = None,
     accionable: bool | None = None,
+    proceso_id: uuid.UUID | None = None,
+    entidad_id: uuid.UUID | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[int, list[dict]]:
@@ -78,7 +82,7 @@ async def listar_hallazgos(
         where = ["1=1"]
         params = []
         idx = 1
-        for field, value in (("estado", estado), ("regla", regla), ("nit", nit), ("accionable", accionable)):
+        for field, value in (("estado", estado), ("regla", regla), ("contribuyente_nit", contribuyente_nit), ("accionable", accionable), ("proceso_id", proceso_id), ("entidad_id", entidad_id)):
             if value is not None:
                 where.append(f"{field} = ${idx}")
                 params.append(value)

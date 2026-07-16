@@ -76,14 +76,14 @@ class OracleBehavioralRepository:
     def __init__(self, client: OracleClient | None = None):
         self.client = client or OracleClient()
 
-    async def obtener_contribuyente(self, nit: str, periodo: str) -> dict | None:
-        result = await self.client.execute_sql(CONTRIBUYENTE_METRICAS_SQL, {"nit": nit, "periodo": periodo})
+    async def obtener_contribuyente(self, contribuyente_nit: str, periodo: str) -> dict | None:
+        result = await self.client.execute_sql(CONTRIBUYENTE_METRICAS_SQL, {"nit": contribuyente_nit, "periodo": periodo})
         if not result:
             return None
         return result[0]
 
-    async def obtener_historico_nit(self, nit: str) -> list[dict]:
-        result = await self.client.execute_sql(HISTORICO_NIT_SQL, {"nit": nit})
+    async def obtener_historico_nit(self, contribuyente_nit: str) -> list[dict]:
+        result = await self.client.execute_sql(HISTORICO_NIT_SQL, {"nit": contribuyente_nit})
         if not result:
             return []
         return result if isinstance(result, list) else [result]

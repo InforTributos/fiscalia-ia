@@ -23,7 +23,7 @@ async def consultar_errores(
         proceso_id=proceso_id,
         intento_id=intento_id,
         capa=capa,
-        nit=nit,
+        contribuyente_nit=nit,
     )
 
     return ErrorsResponse(

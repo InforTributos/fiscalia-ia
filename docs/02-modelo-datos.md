@@ -4,27 +4,28 @@
 
 ## 1. Descripción General
 
-La base de datos PostgreSQL del microservicio consta de **6 tablas** que cubren el ciclo de vida completo de un proceso de fiscalización: desde la creación del proceso por parte de un cliente (auditor/fiscalizador), pasando por la obtención y clasificación de NITs vía MCP, hasta el análisis con LLM y el registro detallado de errores.
+La base de datos PostgreSQL del microservicio consta de **7 tablas principales** que cubren el ciclo de vida completo de un proceso de fiscalización: desde la creación del proceso por parte de una entidad fiscalizadora, pasando por la obtención y clasificación de NITs vía MCP, hasta el análisis con LLM, el registro detallado de errores y la persistencia de hallazgos fiscales.
 
 | Tabla | Propósito | Granularidad |
 |-------|-----------|-------------|
-| `clientes` | Consumidores de la API (auditores/fiscalizadores) | 1 fila por cliente |
+| `entidades_fiscalizadoras` | Consumidores de la API (auditores/fiscalizadores) | 1 fila por entidad fiscalizadora |
 | `procesos` | Cada criterio de fiscalización ejecutado | 1 fila por proceso |
 | `proceso_intentos` | Cada ejecución o re-lanzamiento de un proceso | 1 fila por intento |
 | `proceso_detalle` | NITs obtenidos del MCP y analizados por IA | 1 fila por NIT por intento |
 | `proceso_errores` | Errores a nivel de proceso por intento | 1 fila por error |
 | `proceso_detalle_errores` | Errores por NIT en el detalle | 1 fila por error |
+| `hallazgos_fiscales` | Hallazgos fiscales detectados por reglas (R01-R10) | 1 fila por hallazgo |
 
 ---
 
 ## 2. Tablas
 
-### 2.1. `clientes`
+### 2.1. `entidades_fiscalizadoras`
 
 Registra los consumidores de la API — los auditores o fiscalizadores que lanzan procesos de fiscalización.
 
 ```sql
-CREATE TABLE clientes (
+CREATE TABLE entidades_fiscalizadoras (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nit VARCHAR(20) UNIQUE NOT NULL,
     razon_social VARCHAR(500) NOT NULL,
@@ -36,17 +37,17 @@ CREATE TABLE clientes (
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
-| `id` | `UUID` | Identificador único del cliente, generado automáticamente |
-| `nit` | `VARCHAR(20)` | NIT del cliente (auditor/fiscalizador), único |
-| `razon_social` | `VARCHAR(500)` | Nombre o razón social del cliente |
+| `id` | `UUID` | Identificador único de la entidad, generado automáticamente |
+| `nit` | `VARCHAR(20)` | NIT de la entidad fiscalizadora, único |
+| `razon_social` | `VARCHAR(500)` | Nombre o razón social de la entidad |
 | `email` | `VARCHAR(200)` | Correo electrónico de contacto |
-| `activo` | `BOOLEAN` | Indica si el cliente está habilitado para usar la API |
+| `activo` | `BOOLEAN` | Indica si la entidad está habilitada para usar la API |
 | `created_at` | `TIMESTAMP` | Fecha y hora de registro |
 
 **Índices:**
 
 ```sql
-CREATE INDEX idx_clientes_nit ON clientes(nit);
+CREATE INDEX idx_entidades_nit ON entidades_fiscalizadoras(nit);
 ```
 
 ---
@@ -58,7 +59,7 @@ Representa cada conjunto de criterios de fiscalización ejecutado. Un proceso pu
 ```sql
 CREATE TABLE procesos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cliente_id UUID REFERENCES clientes(id),
+    entidad_id UUID REFERENCES entidades_fiscalizadoras(id),
     nombre VARCHAR(200) NOT NULL,
     estado VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE',
     criteria JSONB NOT NULL,
@@ -75,7 +76,7 @@ CREATE TABLE procesos (
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
 | `id` | `UUID` | Identificador único del proceso |
-| `cliente_id` | `UUID` | FK → `clientes(id)`. Cliente que lanzó el proceso |
+| `entidad_id` | `UUID` | FK → `entidades_fiscalizadoras(id)`. Entidad que lanzó el proceso |
 | `nombre` | `VARCHAR(200)` | Nombre descriptivo del proceso |
 | `estado` | `VARCHAR(30)` | Estado actual del proceso (ver §4) |
 | `criteria` | `JSONB` | Criterios de búsqueda (vigencia, régimen, CIIU, período) |
@@ -91,7 +92,7 @@ CREATE TABLE procesos (
 
 ```sql
 CREATE INDEX idx_procesos_estado ON procesos(estado);
-CREATE INDEX idx_procesos_cliente ON procesos(cliente_id);
+CREATE INDEX idx_procesos_entidad ON procesos(entidad_id);
 ```
 
 ---
@@ -144,7 +145,7 @@ CREATE TABLE proceso_detalle (
     id SERIAL PRIMARY KEY,
     proceso_id UUID REFERENCES procesos(id),
     intento_id INTEGER REFERENCES proceso_intentos(id),
-    nit VARCHAR(20) NOT NULL,
+    contribuyente_nit VARCHAR(20) NOT NULL,
     razon_social VARCHAR(500),
     ciiu VARCHAR(10),
     mcp_score DECIMAL(10,2),
@@ -169,7 +170,7 @@ CREATE TABLE proceso_detalle (
 | `id` | `SERIAL` | Identificador único del detalle |
 | `proceso_id` | `UUID` | FK → `procesos(id)` |
 | `intento_id` | `INTEGER` | FK → `proceso_intentos(id)` |
-| `nit` | `VARCHAR(20)` | NIT del contribuyente |
+| `contribuyente_nit` | `VARCHAR(20)` | NIT del contribuyente |
 | `razon_social` | `VARCHAR(500)` | Razón social del contribuyente |
 | `ciiu` | `VARCHAR(10)` | Código CIIU de la actividad económica |
 | `mcp_score` | `DECIMAL(10,2)` | Score/peso asignado por el MCP al contribuyente |
@@ -192,7 +193,7 @@ CREATE TABLE proceso_detalle (
 ```sql
 CREATE INDEX idx_proceso_detalle_proceso ON proceso_detalle(proceso_id);
 CREATE INDEX idx_proceso_detalle_intento ON proceso_detalle(intento_id);
-CREATE INDEX idx_proceso_detalle_nit ON proceso_detalle(nit);
+CREATE INDEX idx_proceso_detalle_contribuyente ON proceso_detalle(contribuyente_nit);
 CREATE INDEX idx_proceso_detalle_clasificacion ON proceso_detalle(clasificacion);
 ```
 
@@ -244,7 +245,7 @@ Errores específicos por NIT dentro del detalle de un proceso. Permite granulari
 CREATE TABLE proceso_detalle_errores (
     id SERIAL PRIMARY KEY,
     detalle_id INTEGER REFERENCES proceso_detalle(id),
-    nit VARCHAR(20) NOT NULL,
+    contribuyente_nit VARCHAR(20) NOT NULL,
     capa VARCHAR(30) NOT NULL,
     codigo VARCHAR(50) NOT NULL,
     mensaje TEXT NOT NULL,
@@ -257,7 +258,7 @@ CREATE TABLE proceso_detalle_errores (
 |---------|------|-------------|
 | `id` | `SERIAL` | Identificador único del error |
 | `detalle_id` | `INTEGER` | FK → `proceso_detalle(id)` |
-| `nit` | `VARCHAR(20)` | NIT del contribuyente asociado al error |
+| `contribuyente_nit` | `VARCHAR(20)` | NIT del contribuyente asociado al error |
 | `capa` | `VARCHAR(30)` | Capa donde se originó el error (ver §6) |
 | `codigo` | `VARCHAR(50)` | Código del error |
 | `mensaje` | `TEXT` | Mensaje descriptivo del error |
@@ -272,17 +273,89 @@ CREATE INDEX idx_detalle_errores_detalle ON proceso_detalle_errores(detalle_id);
 
 ---
 
+### 2.7. `hallazgos_fiscales`
+
+Hallazgos fiscales detectados por el motor de reglas (R01-R10). Cada hallazgo representa una inconsistencia o incumplimiento específico por contribuyente y período. Tablas relacionadas: `hallazgo_evidencias`, `hallazgo_revisiones`, `hallazgo_revisiones_agente`.
+
+```sql
+CREATE TABLE hallazgos_fiscales (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    contribuyente_nit VARCHAR(20) NOT NULL,
+    proceso_id UUID REFERENCES procesos(id) ON DELETE SET NULL,
+    entidad_id UUID REFERENCES entidades_fiscalizadoras(id) ON DELETE SET NULL,
+    regla VARCHAR(20) NOT NULL,
+    periodo VARCHAR(20) NOT NULL,
+    tipo_hallazgo VARCHAR(40) NOT NULL,
+    fuerza_probatoria VARCHAR(20) NOT NULL,
+    brecha_valor DECIMAL(18,2) DEFAULT 0,
+    impuesto_estimado DECIMAL(18,2) DEFAULT 0,
+    score DECIMAL(5,2) NOT NULL,
+    score_componentes JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ventana_limite DATE NOT NULL,
+    accionable BOOLEAN NOT NULL DEFAULT TRUE,
+    estado VARCHAR(30) NOT NULL DEFAULT 'DETECTADO',
+    resumen TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | `UUID` | Identificador único del hallazgo |
+| `contribuyente_nit` | `VARCHAR(20)` | NIT del contribuyente asociado al hallazgo |
+| `proceso_id` | `UUID` | FK → `procesos(id)` ON DELETE SET NULL. Proceso que generó el hallazgo |
+| `entidad_id` | `UUID` | FK → `entidades_fiscalizadoras(id)` ON DELETE SET NULL. Entidad fiscalizadora |
+| `regla` | `VARCHAR(20)` | Código de la regla fiscal que detectó el hallazgo (R01-R10) |
+| `periodo` | `VARCHAR(20)` | Período fiscal del hallazgo (YYYY o YYYY-MM) |
+| `tipo_hallazgo` | `VARCHAR(40)` | Tipo: `OMISION`, `INCONSISTENCIA_CIIU`, `INCONSISTENCIA_RETENCIONES`, `CAIDA_BSA`, `ANOMALIA_COMPORTAMENTAL` |
+| `fuerza_probatoria` | `VARCHAR(20)` | Nivel: `ALTA`, `MEDIA`, `BAJA`. Según fuente y consistencia de los datos |
+| `brecha_valor` | `DECIMAL(18,2)` | Diferencia monetaria estimada (COP) entre lo declarado y lo real |
+| `impuesto_estimado` | `DECIMAL(18,2)` | Monto estimado del impuesto adeudado (COP) |
+| `score` | `DECIMAL(5,2)` | Score de confianza del hallazgo (0.00 a 1.00) |
+| `score_componentes` | `JSONB` | Desglose JSON del score: regla, comportamiento, temporal, SRF |
+| `ventana_limite` | `DATE` | Fecha límite para acción de fiscalización (prescripción) |
+| `accionable` | `BOOLEAN` | TRUE si el hallazgo es accionable para cobro/fiscalización |
+| `estado` | `VARCHAR(30)` | Estado: `DETECTADO`, `EN_REVISION`, `CONFIRMADO`, `DESCARTADO`, `PRESCRITO` |
+| `resumen` | `TEXT` | Resumen textual del hallazgo generado por IA |
+| `metadata` | `JSONB` | Metadatos JSON: cálculos intermedios, datos crudos, config de reglas |
+| `created_at` | `TIMESTAMP` | Fecha y hora de creación del hallazgo |
+| `updated_at` | `TIMESTAMP` | Fecha y hora de última actualización |
+
+**Foreign Keys:**
+
+| Columna | Referencia | Comportamiento |
+|---------|-----------|----------------|
+| `proceso_id` | `procesos(id)` | `ON DELETE SET NULL` — el hallazgo sobrevive si se elimina el proceso |
+| `entidad_id` | `entidades_fiscalizadoras(id)` | `ON DELETE SET NULL` — el hallazgo sobrevive si se elimina la entidad |
+
+**Índices:**
+
+```sql
+CREATE INDEX idx_hallazgos_contribuyente_periodo ON hallazgos_fiscales(contribuyente_nit, periodo);
+CREATE INDEX idx_hallazgos_estado_score ON hallazgos_fiscales(estado, score DESC);
+CREATE INDEX idx_hallazgos_regla ON hallazgos_fiscales(regla);
+CREATE INDEX idx_hallazgos_accionable ON hallazgos_fiscales(accionable);
+CREATE INDEX idx_hallazgos_proceso ON hallazgos_fiscales(proceso_id);
+CREATE INDEX idx_hallazgos_entidad ON hallazgos_fiscales(entidad_id);
+```
+
+---
+
 ## 3. Diagrama Entidad-Relación
 
 ```mermaid
 erDiagram
-    clientes ||--o{ procesos : "lanza"
+    entidades_fiscalizadoras ||--o{ procesos : "lanza"
+    entidades_fiscalizadoras ||--o{ hallazgos_fiscales : "genera"
     procesos ||--o{ proceso_intentos : "tiene"
     procesos ||--o{ proceso_detalle : "detalla"
+    procesos ||--o{ hallazgos_fiscales : "produce"
     proceso_intentos ||--o{ proceso_errores : "registra"
     proceso_detalle ||--o{ proceso_detalle_errores : "puede tener"
 
-    clientes {
+    entidades_fiscalizadoras {
         uuid id PK
         varchar nit UK
         varchar razon_social
@@ -293,7 +366,7 @@ erDiagram
 
     procesos {
         uuid id PK
-        uuid cliente_id FK
+        uuid entidad_id FK
         varchar nombre
         varchar estado
         jsonb criteria
@@ -322,7 +395,7 @@ erDiagram
         serial id PK
         uuid proceso_id FK
         int intento_id FK
-        varchar nit
+        varchar contribuyente_nit
         varchar razon_social
         varchar ciiu
         decimal mcp_score
@@ -355,12 +428,34 @@ erDiagram
     proceso_detalle_errores {
         serial id PK
         int detalle_id FK
-        varchar nit
+        varchar contribuyente_nit
         varchar capa
         varchar codigo
         text mensaje
         jsonb contexto
         timestamp created_at
+    }
+
+    hallazgos_fiscales {
+        uuid id PK
+        varchar contribuyente_nit
+        uuid proceso_id FK
+        uuid entidad_id FK
+        varchar regla
+        varchar periodo
+        varchar tipo_hallazgo
+        varchar fuerza_probatoria
+        decimal brecha_valor
+        decimal impuesto_estimado
+        decimal score
+        jsonb score_componentes
+        date ventana_limite
+        boolean accionable
+        varchar estado
+        text resumen
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
     }
 ```
 
@@ -401,7 +496,7 @@ stateDiagram-v2
 
 ### Re-lanzamiento
 
-Cuando se envía el mismo `cliente_nit` + mismos `criteria` de un proceso previo:
+Cuando se envía el mismo `entidad_nit` + mismos `criteria` de un proceso previo:
 
 | Situación | Comportamiento |
 |-----------|---------------|
@@ -420,7 +515,7 @@ Cuando se envía el mismo `cliente_nit` + mismos `criteria` de un proceso previo
 | `proceso_detalle` | 2 años | DELETE en cascada desde `procesos` |
 | `proceso_errores` | 1 año | DELETE después de 1 año |
 | `proceso_detalle_errores` | 1 año | DELETE después de 1 año |
-| `clientes` | Indefinido | Nunca se eliminan (son cuentas de auditores) |
+| `entidades_fiscalizadoras` | Indefinido | Nunca se eliminan (son cuentas de entidades fiscalizadoras) |
 | Logs de aplicación | 6 meses | Rotación / archivado |
 
 **Implementación:** Job mensual en PostgreSQL (cron o pg_timetable) que ejecuta las limpiezas según las ventanas de retención definidas.

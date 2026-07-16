@@ -2,14 +2,14 @@ from pydantic import BaseModel
 
 
 class MCPNitResult(BaseModel):
-    nit: str
+    contribuyente_nit: str
     score_peso: float = 0.0
     es_candidato: bool = True
     razon: str = ""
 
 
 class DatosFiscales(BaseModel):
-    nit: str
+    contribuyente_nit: str
     razon_social: str = ""
     ciiu: str = ""
     regimen: str = ""
@@ -35,7 +35,7 @@ class ComponenteSRF(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
-    nit: str
+    contribuyente_nit: str
     razon_social: str = ""
     ciiu: str = ""
     clasificacion: str = "PENDIENTE"

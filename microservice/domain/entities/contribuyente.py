@@ -5,7 +5,7 @@ from domain.value_objects.nit import NIT
 
 @dataclass
 class Contribuyente:
-    nit: NIT
+    contribuyente_nit: NIT
     razon_social: str
     ciiu: str | None = None
     municipio: str | None = None
@@ -15,7 +15,7 @@ class Contribuyente:
     @classmethod
     def desde_fila(cls, fila: dict):
         return cls(
-            nit=NIT(fila.get("nit", "")),
+            contribuyente_nit=NIT(fila.get("contribuyente_nit", "")),
             razon_social=fila.get("razon_social", ""),
             ciiu=fila.get("ciiu"),
             municipio=fila.get("municipio"),

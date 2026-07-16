@@ -104,7 +104,7 @@ BEGIN
     l_response := apex_web_service.make_rest_request(
         p_url         => 'http://<container-ip>:8000/api/v1/analizar/9003189639',
         p_http_method => 'POST',
-        p_body        => '{ "cliente_nit": "9003189639", "nit_objetivo": "9012345678" }'
+        p_body        => '{ "entidad_nit": "9003189639", "nit_objetivo": "9012345678" }'
     );
 END;
 ```

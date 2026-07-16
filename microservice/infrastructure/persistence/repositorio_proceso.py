@@ -5,17 +5,17 @@ from infrastructure.persistence import queries
 
 
 class PostgresProcesoRepo(ProcesoRepo):
-    async def crear_cliente(self, nit: str, razon_social: str) -> UUID | None:
-        return await queries.crear_cliente(nit, razon_social)
+    async def crear_entidad(self, entidad_nit: str, razon_social: str, email: str | None = None) -> UUID | None:
+        return await queries.crear_entidad(entidad_nit, razon_social, email)
 
-    async def obtener_cliente_por_nit(self, nit: str) -> dict | None:
-        return await queries.obtener_cliente_por_nit(nit)
+    async def obtener_entidad_por_nit(self, entidad_nit: str) -> dict | None:
+        return await queries.obtener_entidad_por_nit(entidad_nit)
 
-    async def crear_proceso(self, cliente_id: UUID, nombre: str, criteria: dict) -> UUID | None:
-        return await queries.crear_proceso(cliente_id, nombre, criteria)
+    async def crear_proceso(self, entidad_id: UUID, nombre: str, criteria: dict) -> UUID | None:
+        return await queries.crear_proceso(entidad_id, nombre, criteria)
 
-    async def obtener_proceso_por_criteria(self, cliente_id: UUID, criteria: dict) -> dict | None:
-        return await queries.obtener_proceso_por_criteria(cliente_id, criteria)
+    async def obtener_proceso_por_criteria(self, entidad_id: UUID, criteria: dict) -> dict | None:
+        return await queries.obtener_proceso_por_criteria(entidad_id, criteria)
 
     async def obtener_proceso(self, id: UUID) -> dict | None:
         return await queries.obtener_proceso(id)
@@ -38,8 +38,8 @@ class PostgresProcesoRepo(ProcesoRepo):
     async def actualizar_progreso_intento(self, id: int, procesados: int, errores_count: int):
         return await queries.actualizar_progreso_intento(id, procesados, errores_count)
 
-    async def obtener_cliente_por_id(self, cliente_id: UUID) -> dict | None:
-        return await queries.obtener_cliente_por_id(cliente_id)
+    async def obtener_entidad_por_id(self, entidad_id: UUID) -> dict | None:
+        return await queries.obtener_entidad_por_id(entidad_id)
 
     async def insertar_detalle(self, proceso_id: UUID, intento_id: int, **kwargs) -> int | None:
         return await queries.insertar_detalle(proceso_id, intento_id, **kwargs)
@@ -50,17 +50,20 @@ class PostgresProcesoRepo(ProcesoRepo):
     async def actualizar_resultado_detalle(self, id: int, **kwargs):
         return await queries.actualizar_resultado_detalle(id, **kwargs)
 
+    async def actualizar_estado_detalle(self, id: int, mensaje: str | None = None, clasificacion: str | None = None):
+        return await queries.actualizar_estado_detalle(id, mensaje, clasificacion)
+
     async def insertar_error_proceso(self, proceso_id: UUID, intento_id: int, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
         return await queries.insertar_error_proceso(proceso_id, intento_id, capa, codigo, mensaje, contexto)
 
-    async def insertar_error_detalle(self, proceso_id: UUID, detalle_id: int, nit: str, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
-        return await queries.insertar_error_detalle(proceso_id, detalle_id, nit, capa, codigo, mensaje, contexto)
+    async def insertar_error_detalle(self, proceso_id: UUID, detalle_id: int, contribuyente_nit: str, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
+        return await queries.insertar_error_detalle(proceso_id, detalle_id, contribuyente_nit, capa, codigo, mensaje, contexto)
 
-    async def desactivar_cliente(self, cliente_id: UUID) -> None:
-        return await queries.desactivar_cliente(cliente_id)
+    async def desactivar_entidad(self, entidad_id: UUID) -> None:
+        return await queries.desactivar_entidad(entidad_id)
 
-    async def reactivar_cliente(self, cliente_id: UUID) -> None:
-        return await queries.reactivar_cliente(cliente_id)
+    async def reactivar_entidad(self, entidad_id: UUID) -> None:
+        return await queries.reactivar_entidad(entidad_id)
 
     async def listar_proceso_detalle(self, proceso_id: UUID, **filtros):
         return await queries.listar_proceso_detalle(proceso_id, **filtros)

@@ -19,13 +19,13 @@ def _stable_id(prefix: str, value: str) -> str:
 
 
 def _company_node(row: dict) -> GraphNode:
-    nit = str(row.get("nit", ""))
+    contribuyente_nit = str(row.get("contribuyente_nit", ""))
     return GraphNode(
-        id=f"empresa:{nit}",
+        id=f"empresa:{contribuyente_nit}",
         tipo="EMPRESA",
-        label=str(row.get("razon_social") or nit),
+        label=str(row.get("razon_social") or contribuyente_nit),
         propiedades={
-            "nit": nit,
+            "contribuyente_nit": contribuyente_nit,
             "ciiu": row.get("ciiu", ""),
             "regimen": row.get("regimen", row.get("tipo_regimen", "")),
         },
@@ -74,7 +74,7 @@ def build_taxpayer_graph(
         ))
 
         for row in relacionados:
-            if str(row.get("nit", "")) == str(contribuyente.get("nit", "")):
+            if str(row.get("contribuyente_nit", "")) == str(contribuyente.get("contribuyente_nit", "")):
                 continue
             related_node = _company_node(row)
             nodes_by_id[related_node.id] = related_node
@@ -115,7 +115,7 @@ def build_taxpayer_graph(
             ))
 
     return TaxpayerGraph(
-        nit=str(contribuyente.get("nit", "")),
+        contribuyente_nit=str(contribuyente.get("contribuyente_nit", "")),
         nodes=list(nodes_by_id.values()),
         edges=edges,
     )
@@ -123,7 +123,7 @@ def build_taxpayer_graph(
 
 def graph_to_dict(graph: TaxpayerGraph) -> dict:
     return {
-        "nit": graph.nit,
+        "contribuyente_nit": graph.contribuyente_nit,
         "nodes": [asdict(node) for node in graph.nodes],
         "edges": [asdict(edge) for edge in graph.edges],
     }

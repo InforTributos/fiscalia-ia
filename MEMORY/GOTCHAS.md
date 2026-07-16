@@ -150,6 +150,20 @@ RETRY_TIMEOUT=60
 
 Intentos: 0s → 2s → 4s → abort (3 intentos totales, 2 retrasos con backoff).
 
+## `contribuyente_nit` vs `entidad_nit` — naming convention
+
+Tres tablas usan NITs, pero con nombres distintos según su rol semántico:
+
+| Contexto | Columna | Significado |
+|---|---|---|
+| `proceso_detalle.contribuyente_nit` | `contribuyente_nit` | NIT del contribuyente fiscalizado |
+| `proceso_detalle_errores.contribuyente_nit` | `contribuyente_nit` | NIT del contribuyente asociado al error |
+| `hallazgos_fiscales.contribuyente_nit` | `contribuyente_nit` | NIT del contribuyente del hallazgo |
+| `entidades_fiscalizadoras.nit` | `nit` (sin prefijo) | NIT de la entidad fiscalizadora (municipio) |
+| API request/response | `entidad_nit` | NIT de la entidad fiscalizadora en JSON |
+
+Regla: si el NIT se refiere al **contribuyente investigado**, es `contribuyente_nit`. Si se refiere a la **entidad fiscalizadora** (municipio), es `nit` en DB y `entidad_nit` en API. Las migraciones `010` y `011` aplicaron estos cambios.
+
 ## Commit format: hats AI-DLC
 
 ```bash

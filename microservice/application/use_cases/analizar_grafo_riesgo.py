@@ -18,19 +18,19 @@ class AnalizarGrafoRiesgoUseCase:
 
     async def analizar_nit(
         self,
-        nit: str,
+        contribuyente_nit: str,
         periodo: str,
         min_pares: int = 10,
         incluir_comportamiento: bool = True,
     ) -> dict:
-        contribuyente = await self.graph_repo.obtener_contribuyente(nit)
+        contribuyente = await self.graph_repo.obtener_contribuyente(contribuyente_nit)
         if not contribuyente:
-            raise NITNoEncontradoError(nit)
+            raise NITNoEncontradoError(contribuyente_nit)
 
         analisis_comportamental = None
         if incluir_comportamiento:
             analisis_comportamental = await self.comportamiento_use_case.analizar_nit(
-                nit=nit,
+                contribuyente_nit=contribuyente_nit,
                 periodo=periodo,
                 min_pares=min_pares,
             )

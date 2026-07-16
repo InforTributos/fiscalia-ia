@@ -11,6 +11,9 @@ PROMPT_ANALISIS_OMISO = """
 Eres un experto en fiscalización tributaria municipal de {municipio}, Colombia.
 Analiza el siguiente contribuyente OMISO en el pago del Impuesto de Industria y Comercio (ICA).
 
+INSTRUCCIÓN IMPORTANTE: La respuesta "explicacion" debe ser SOLO texto en lenguaje natural.
+NO incluyas bloques de código, JSON, ni estructuras de datos en la explicación.
+
 Datos del contribuyente:
 {datos_fiscales}
 
@@ -25,6 +28,9 @@ Genera un JSON con la siguiente estructura:
 PROMPT_ANALISIS_INEXACTO = """
 Eres un experto en fiscalización tributaria municipal de {municipio}, Colombia.
 Analiza las siguientes INCONSISTENCIAS en la declaración de ICA de un contribuyente.
+
+INSTRUCCIÓN IMPORTANTE: Cada campo "explicacion_ia" debe ser SOLO texto en lenguaje natural.
+NO incluyas bloques de código, JSON, ni estructuras de datos.
 
 Datos del contribuyente:
 {datos_fiscales}

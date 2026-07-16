@@ -1,7 +1,7 @@
 from domain.errors import (
-    ClienteNoEncontradoError,
     ConfiguracionInvalidaError,
     CriteriosInvalidosError,
+    EntidadNoEncontradoError,
     FiscalIAError,
     HallazgoNoEncontradoError,
     LLMAllProvidersFailedError,
@@ -53,9 +53,9 @@ def test_proceso_no_encontrado():
     assert "abc-123" in err.mensaje
 
 
-def test_cliente_no_encontrado():
-    err = ClienteNoEncontradoError("9003189639")
-    assert err.codigo == "CLIENTE_NO_ENCONTRADO"
+def test_entidad_no_encontrado():
+    err = EntidadNoEncontradoError("9003189639")
+    assert err.codigo == "ENTIDAD_NO_ENCONTRADA"
     assert err.status_code == 404
 
 

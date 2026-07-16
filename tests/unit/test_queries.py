@@ -25,58 +25,58 @@ def mock_pool(mock_conn):
     return pool, mock_conn
 
 
-# ── crear_cliente ──
+# ── crear_entidad ──
 
 @patch("infrastructure.persistence.queries.get_pool")
-async def test_crear_cliente(mock_get_pool, mock_pool):
+async def test_crear_entidad(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchrow.return_value = {"id": UUID1}
 
-    result = await queries.crear_cliente("9003189639", "EMPRESA S.A.", "email@test.com")
+    result = await queries.crear_entidad("9003189639", "EMPRESA S.A.", "email@test.com")
     assert result == UUID1
     conn.fetchrow.assert_awaited_once()
 
 
 @patch("infrastructure.persistence.queries.get_pool")
-async def test_crear_cliente_sin_email(mock_get_pool, mock_pool):
+async def test_crear_entidad_sin_email(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchrow.return_value = {"id": UUID1}
 
-    result = await queries.crear_cliente("9003189639", "EMPRESA S.A.")
+    result = await queries.crear_entidad("9003189639", "EMPRESA S.A.")
     assert result == UUID1
 
 
 @patch("infrastructure.persistence.queries.get_pool")
-async def test_crear_cliente_retorna_none(mock_get_pool, mock_pool):
+async def test_crear_entidad_retorna_none(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchrow.return_value = None
 
-    result = await queries.crear_cliente("9003189639", "EMPRESA S.A.")
+    result = await queries.crear_entidad("9003189639", "EMPRESA S.A.")
     assert result is None
 
 
-# ── obtener_cliente_por_nit ──
+# ── obtener_entidad_por_nit ──
 
 @patch("infrastructure.persistence.queries.get_pool")
-async def test_obtener_cliente_por_nit(mock_get_pool, mock_pool):
+async def test_obtener_entidad_por_nit(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchrow.return_value = {"id": UUID1, "nit": "9003189639"}
 
-    result = await queries.obtener_cliente_por_nit("9003189639")
+    result = await queries.obtener_entidad_por_nit("9003189639")
     assert result["nit"] == "9003189639"
 
 
 @patch("infrastructure.persistence.queries.get_pool")
-async def test_obtener_cliente_por_nit_no_encontrado(mock_get_pool, mock_pool):
+async def test_obtener_entidad_por_nit_no_encontrado(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchrow.return_value = None
 
-    result = await queries.obtener_cliente_por_nit("9999999999")
+    result = await queries.obtener_entidad_por_nit("9999999999")
     assert result is None
 
 
@@ -322,6 +322,66 @@ async def test_mergear_hallazgos_detalle(mock_get_pool, mock_pool):
     conn.execute.assert_awaited_once()
 
 
+# ── actualizar_estado_detalle ──
+
+
+@patch("infrastructure.persistence.queries.get_pool")
+async def test_actualizar_estado_detalle_mensaje(mock_get_pool, mock_pool):
+    pool, conn = mock_pool
+    mock_get_pool.return_value = pool
+
+    await queries.actualizar_estado_detalle(1, mensaje="Sin datos fiscales")
+
+    conn.execute.assert_awaited_once()
+    sql = conn.execute.call_args[0][0]
+    assert "mensaje = $1" in sql
+    assert "WHERE id = $2" in sql
+    assert conn.execute.call_args[0][1] == "Sin datos fiscales"
+    assert conn.execute.call_args[0][2] == 1
+
+
+@patch("infrastructure.persistence.queries.get_pool")
+async def test_actualizar_estado_detalle_clasificacion(mock_get_pool, mock_pool):
+    pool, conn = mock_pool
+    mock_get_pool.return_value = pool
+
+    await queries.actualizar_estado_detalle(1, clasificacion="OMISO")
+
+    conn.execute.assert_awaited_once()
+    sql = conn.execute.call_args[0][0]
+    assert "clasificacion = $1" in sql
+    assert "WHERE id = $2" in sql
+    assert conn.execute.call_args[0][1] == "OMISO"
+    assert conn.execute.call_args[0][2] == 1
+
+
+@patch("infrastructure.persistence.queries.get_pool")
+async def test_actualizar_estado_detalle_mensaje_y_clasificacion(mock_get_pool, mock_pool):
+    pool, conn = mock_pool
+    mock_get_pool.return_value = pool
+
+    await queries.actualizar_estado_detalle(1, mensaje="Sin datos", clasificacion="INEXACTO")
+
+    conn.execute.assert_awaited_once()
+    sql = conn.execute.call_args[0][0]
+    assert "mensaje = $1" in sql
+    assert "clasificacion = $2" in sql
+    assert "WHERE id = $3" in sql
+    assert conn.execute.call_args[0][1] == "Sin datos"
+    assert conn.execute.call_args[0][2] == "INEXACTO"
+    assert conn.execute.call_args[0][3] == 1
+
+
+@patch("infrastructure.persistence.queries.get_pool")
+async def test_actualizar_estado_detalle_sin_parametros(mock_get_pool, mock_pool):
+    pool, conn = mock_pool
+    mock_get_pool.return_value = pool
+
+    await queries.actualizar_estado_detalle(1)
+
+    conn.execute.assert_not_called()
+
+
 # ── insertar_error_proceso ──
 
 @patch("infrastructure.persistence.queries.get_pool")
@@ -370,8 +430,8 @@ async def test_listar_proceso_detalle_sin_filtros(mock_get_pool, mock_pool):
     mock_get_pool.return_value = pool
     conn.fetchval.return_value = 2
     conn.fetch.return_value = [
-        {"id": 1, "nit": "9003189639"},
-        {"id": 2, "nit": "9003189640"},
+        {"id": 1, "contribuyente_nit": "9003189639"},
+        {"id": 2, "contribuyente_nit": "9003189640"},
     ]
 
     total, rows = await queries.listar_proceso_detalle(UUID1)
@@ -384,7 +444,7 @@ async def test_listar_proceso_detalle_con_filtros(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchval.return_value = 1
-    conn.fetch.return_value = [{"id": 1, "nit": "9003189639", "mcp_score": 85.0}]
+    conn.fetch.return_value = [{"id": 1, "contribuyente_nit": "9003189639", "mcp_score": 85.0}]
 
     total, rows = await queries.listar_proceso_detalle(
         UUID1, intento_id=1, clasificacion="OMISO", min_score=50.0,
@@ -397,7 +457,7 @@ async def test_listar_proceso_detalle_con_paginacion(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchval.return_value = 3
-    conn.fetch.return_value = [{"id": 1, "nit": "9003189639"}]
+    conn.fetch.return_value = [{"id": 1, "contribuyente_nit": "9003189639"}]
 
     total, rows = await queries.listar_proceso_detalle(UUID1, page=2, page_size=10)
     assert total == 3
@@ -419,9 +479,9 @@ async def test_listar_errores(mock_get_pool, mock_pool):
 async def test_listar_errores_con_filtros(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
-    conn.fetch.return_value = [{"id": 1, "capa": "MCP"}]
+    conn.fetch.return_value = [{"id": 1, "capa": "MCP", "contribuyente_nit": "9003189639"}]
 
-    err_proc, err_det = await queries.listar_errores(UUID1, intento_id=1, capa="MCP", nit="9003189639")
+    err_proc, err_det = await queries.listar_errores(UUID1, intento_id=1, capa="MCP", contribuyente_nit="9003189639")
     assert len(err_proc) == 1
 
 
@@ -467,23 +527,23 @@ async def test_obtener_historial_intentos_vacio(mock_get_pool, mock_pool):
     assert result == []
 
 
-# ── obtener_cliente_por_id ──
+# ── obtener_entidad_por_id ──
 
 @patch("infrastructure.persistence.queries.get_pool")
-async def test_obtener_cliente_por_id(mock_get_pool, mock_pool):
+async def test_obtener_entidad_por_id(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchrow.return_value = {"id": UUID1, "nit": "9003189639"}
 
-    result = await queries.obtener_cliente_por_id(UUID1)
+    result = await queries.obtener_entidad_por_id(UUID1)
     assert result["id"] == UUID1
 
 
 @patch("infrastructure.persistence.queries.get_pool")
-async def test_obtener_cliente_por_id_no_encontrado(mock_get_pool, mock_pool):
+async def test_obtener_entidad_por_id_no_encontrado(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchrow.return_value = None
 
-    result = await queries.obtener_cliente_por_id(UUID1)
+    result = await queries.obtener_entidad_por_id(UUID1)
     assert result is None

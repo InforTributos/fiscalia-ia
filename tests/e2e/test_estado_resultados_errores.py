@@ -20,7 +20,7 @@ def test_consultar_estado_proceso_existente(client: TestClient):
 
     with (
         patch.object(real_repo, "obtener_proceso", AsyncMock(return_value={
-            "id": PID, "estado": "EN_PROCESO", "cliente_id": uuid.uuid4(),
+            "id": PID, "estado": "EN_PROCESO", "entidad_id": uuid.uuid4(),
             "nombre": "Test", "criteria": "{}", "created_at": None,
             "total_nits": 10, "candidatos": 10, "omisos": 5, "inexactos": 5,
         })),
@@ -29,7 +29,7 @@ def test_consultar_estado_proceso_existente(client: TestClient):
             "procesados": 5, "errores_count": 1, "started_at": None, "completed_at": None,
         })),
         patch.object(real_repo, "obtener_historial_intentos", AsyncMock(return_value=[])),
-        patch.object(real_repo, "obtener_cliente_por_id", AsyncMock(return_value={
+        patch.object(real_repo, "obtener_entidad_por_id", AsyncMock(return_value={
             "id": uuid.uuid4(), "nit": "9003189639",
         })),
     ):
@@ -57,7 +57,7 @@ def test_consultar_resultados_con_filtros(client: TestClient):
 
     with (
         patch.object(real_repo, "obtener_proceso", AsyncMock(return_value={
-            "id": PID, "estado": "COMPLETADO", "cliente_id": uuid.uuid4(),
+            "id": PID, "estado": "COMPLETADO", "entidad_id": uuid.uuid4(),
         })),
         patch.object(real_repo, "listar_proceso_detalle", AsyncMock(return_value=(2, [
             {"id": 1, "nit": "9003189639", "razon_social": "EMPRESA UNO",
@@ -83,7 +83,7 @@ def test_consultar_resultados_sin_terminar_rechaza(client: TestClient):
     from routers.results import repo as real_repo
 
     with patch.object(real_repo, "obtener_proceso", AsyncMock(return_value={
-        "id": PID, "estado": "EN_PROCESO", "cliente_id": uuid.uuid4(),
+        "id": PID, "estado": "EN_PROCESO", "entidad_id": uuid.uuid4(),
     })):
         resp = client.get(f"/api/v1/proceso/{PID}/results")
 

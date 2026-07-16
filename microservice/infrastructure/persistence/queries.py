@@ -4,51 +4,54 @@ import uuid
 from .connection import get_pool
 
 
-async def crear_cliente(nit: str, razon_social: str, email: str | None = None) -> uuid.UUID | None:
+async def crear_entidad(entidad_nit: str, razon_social: str, email: str | None = None) -> uuid.UUID | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO clientes (nit, razon_social, email)
+            INSERT INTO entidades_fiscalizadoras (nit, razon_social, email)
             VALUES ($1, $2, $3)
             RETURNING id
             """,
-            nit, razon_social, email,
+            entidad_nit, razon_social, email,
         )
         return row["id"] if row else None
 
 
-async def obtener_cliente_por_nit(nit: str) -> dict | None:
+async def obtener_entidad_por_nit(entidad_nit: str) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT * FROM clientes WHERE nit = $1 AND activo = TRUE", nit)
+        row = await conn.fetchrow(
+            "SELECT * FROM entidades_fiscalizadoras WHERE regexp_replace(nit, '-\\d+$', '') = regexp_replace($1, '-\\d+$', '') AND activo = TRUE",
+            entidad_nit,
+        )
         return dict(row) if row else None
 
 
-async def crear_proceso(cliente_id: uuid.UUID, nombre: str, criteria: dict) -> uuid.UUID | None:
+async def crear_proceso(entidad_id: uuid.UUID, nombre: str, criteria: dict) -> uuid.UUID | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO procesos (cliente_id, nombre, estado, criteria)
+            INSERT INTO procesos (entidad_id, nombre, estado, criteria)
             VALUES ($1, $2, 'PENDIENTE', $3::jsonb)
             RETURNING id
             """,
-            cliente_id, nombre, json.dumps(criteria),
+            entidad_id, nombre, json.dumps(criteria),
         )
         return row["id"] if row else None
 
 
-async def obtener_proceso_por_criteria(cliente_id: uuid.UUID, criteria: dict) -> dict | None:
+async def obtener_proceso_por_criteria(entidad_id: uuid.UUID, criteria: dict) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
             SELECT * FROM procesos
-            WHERE cliente_id = $1 AND criteria::text = $2::text
+            WHERE entidad_id = $1 AND criteria::text = $2::text
             ORDER BY created_at DESC LIMIT 1
             """,
-            cliente_id, json.dumps(criteria),
+            entidad_id, json.dumps(criteria),
         )
         return dict(row) if row else None
 
@@ -116,23 +119,24 @@ async def actualizar_progreso_intento(id: int, procesados: int, errores_count: i
 
 
 async def insertar_detalle(
-    proceso_id: uuid.UUID, intento_id: int, nit: str,
+    proceso_id: uuid.UUID, intento_id: int, contribuyente_nit: str,
     clasificacion: str, pagina: int = 0,
     razon_social: str | None = None, ciiu: str | None = None,
     mcp_score: float | None = None, es_candidato: bool = True,
     mcp_razon: str | None = None,
+    detalle_clasificacion: str | None = None,
 ) -> int | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO proceso_detalle (proceso_id, intento_id, nit, razon_social, ciiu,
-                mcp_score, es_candidato, mcp_razon, clasificacion, pagina)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            INSERT INTO proceso_detalle (proceso_id, intento_id, contribuyente_nit, razon_social, ciiu,
+                mcp_score, es_candidato, mcp_razon, clasificacion, pagina, detalle_clasificacion)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING id
             """,
-            proceso_id, intento_id, nit, razon_social, ciiu,
-            mcp_score, es_candidato, mcp_razon, clasificacion, pagina,
+            proceso_id, intento_id, contribuyente_nit, razon_social, ciiu,
+            mcp_score, es_candidato, mcp_razon, clasificacion, pagina, detalle_clasificacion,
         )
         return row["id"] if row else None
 
@@ -176,6 +180,29 @@ async def mergear_criteria_proceso(id: uuid.UUID, extra: dict) -> None:
         )
 
 
+async def actualizar_estado_detalle(id: int, mensaje: str | None = None, clasificacion: str | None = None) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        sets = []
+        params = []
+        idx = 1
+        if mensaje is not None:
+            sets.append(f"mensaje = ${idx}")
+            params.append(mensaje)
+            idx += 1
+        if clasificacion is not None:
+            sets.append(f"clasificacion = ${idx}")
+            params.append(clasificacion)
+            idx += 1
+        if not sets:
+            return
+        params.append(id)
+        await conn.execute(
+            f"UPDATE proceso_detalle SET {', '.join(sets)} WHERE id = ${idx}",
+            *params,
+        )
+
+
 async def mergear_hallazgos_detalle(id: int, hallazgos_extra: list) -> None:
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -190,6 +217,35 @@ async def mergear_hallazgos_detalle(id: int, hallazgos_extra: list) -> None:
         )
 
 
+async def mergear_resultados_enriquecimiento(detalle_id: int, hallazgos: list, mcp_score: float | None = None) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if hallazgos and mcp_score is not None:
+            await conn.execute(
+                """
+                UPDATE proceso_detalle
+                SET hallazgos = COALESCE(hallazgos, '[]'::jsonb) || $1::jsonb,
+                    mcp_score = $2
+                WHERE id = $3
+                """,
+                json.dumps(hallazgos), mcp_score, detalle_id,
+            )
+        elif hallazgos:
+            await conn.execute(
+                """
+                UPDATE proceso_detalle
+                SET hallazgos = COALESCE(hallazgos, '[]'::jsonb) || $1::jsonb
+                WHERE id = $2
+                """,
+                json.dumps(hallazgos), detalle_id,
+            )
+        elif mcp_score is not None:
+            await conn.execute(
+                "UPDATE proceso_detalle SET mcp_score = $1 WHERE id = $2",
+                mcp_score, detalle_id,
+            )
+
+
 async def insertar_error_proceso(proceso_id: uuid.UUID, intento_id: int, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -202,15 +258,15 @@ async def insertar_error_proceso(proceso_id: uuid.UUID, intento_id: int, capa: s
         )
 
 
-async def insertar_error_detalle(proceso_id: uuid.UUID, detalle_id: int, nit: str, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
+async def insertar_error_detalle(proceso_id: uuid.UUID, detalle_id: int, contribuyente_nit: str, capa: str, codigo: str, mensaje: str, contexto: dict | None = None):
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
             """
-            INSERT INTO proceso_detalle_errores (proceso_id, detalle_id, nit, capa, codigo, mensaje, contexto)
+            INSERT INTO proceso_detalle_errores (proceso_id, detalle_id, contribuyente_nit, capa, codigo, mensaje, contexto)
             VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
             """,
-            proceso_id, detalle_id, nit, capa, codigo, mensaje, json.dumps(contexto) if contexto else None,
+            proceso_id, detalle_id, contribuyente_nit, capa, codigo, mensaje, json.dumps(contexto) if contexto else None,
         )
 
 
@@ -239,7 +295,7 @@ async def listar_proceso_detalle(
             idx += 1
 
         dir_sql = "ASC" if direccion.upper() == "ASC" else "DESC"
-        order_col = ordenar_por if ordenar_por in ("mcp_score", "nit", "created_at") else "mcp_score"
+        order_col = ordenar_por if ordenar_por in ("mcp_score", "contribuyente_nit", "created_at") else "mcp_score"
         offset = (page - 1) * page_size
 
         count_row = await conn.fetchval(
@@ -255,7 +311,7 @@ async def listar_proceso_detalle(
 
 async def listar_errores(
     proceso_id: uuid.UUID, intento_id: int | None = None,
-    capa: str | None = None, nit: str | None = None,
+    capa: str | None = None, contribuyente_nit: str | None = None,
 ):
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -274,9 +330,9 @@ async def listar_errores(
         where_det = ["proceso_id = $1"]
         params_det = [proceso_id]
         idx_det = 2
-        if nit:
-            where_det.append(f"nit = ${idx_det}")
-            params_det.append(nit)
+        if contribuyente_nit:
+            where_det.append(f"contribuyente_nit = ${idx_det}")
+            params_det.append(contribuyente_nit)
             idx_det += 1
         if capa:
             where_det.append(f"capa = ${idx_det}")
@@ -318,23 +374,23 @@ async def obtener_historial_intentos(proceso_id: uuid.UUID) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-async def obtener_cliente_por_id(cliente_id: uuid.UUID) -> dict | None:
+async def obtener_entidad_por_id(entidad_id: uuid.UUID) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT * FROM clientes WHERE id = $1", cliente_id)
+        row = await conn.fetchrow("SELECT * FROM entidades_fiscalizadoras WHERE id = $1", entidad_id)
         return dict(row) if row else None
 
 
-async def desactivar_cliente(cliente_id: uuid.UUID) -> None:
+async def desactivar_entidad(entidad_id: uuid.UUID) -> None:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE clientes SET activo = FALSE WHERE id = $1", cliente_id)
+        await conn.execute("UPDATE entidades_fiscalizadoras SET activo = FALSE WHERE id = $1", entidad_id)
 
 
-async def reactivar_cliente(cliente_id: uuid.UUID) -> None:
+async def reactivar_entidad(entidad_id: uuid.UUID) -> None:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE clientes SET activo = TRUE WHERE id = $1", cliente_id)
+        await conn.execute("UPDATE entidades_fiscalizadoras SET activo = TRUE WHERE id = $1", entidad_id)
 
 
 async def bulk_insertar_detalle(rows: list[dict]) -> list[int]:
@@ -350,7 +406,7 @@ async def bulk_insertar_detalle(rows: list[dict]) -> list[int]:
                 f"(${idx}, ${idx+1}, ${idx+2}, ${idx+3}, ${idx+4}, ${idx+5}, ${idx+6}, ${idx+7}, ${idx+8}, ${idx+9}, ${idx+10})"
             )
             params.extend([
-                r["proceso_id"], r["intento_id"], r["nit"],
+                r["proceso_id"], r["intento_id"], r["contribuyente_nit"],
                 r.get("razon_social"), r.get("ciiu"),
                 r.get("mcp_score"), r.get("es_candidato", True),
                 r.get("mcp_razon"), r.get("clasificacion"), r.get("pagina", 0),
@@ -358,7 +414,7 @@ async def bulk_insertar_detalle(rows: list[dict]) -> list[int]:
             ])
             idx += 11
         sql = f"""
-            INSERT INTO proceso_detalle (proceso_id, intento_id, nit, razon_social, ciiu,
+            INSERT INTO proceso_detalle (proceso_id, intento_id, contribuyente_nit, razon_social, ciiu,
                 mcp_score, es_candidato, mcp_razon, clasificacion, pagina, detalle_clasificacion)
             VALUES {', '.join(values)}
             RETURNING id

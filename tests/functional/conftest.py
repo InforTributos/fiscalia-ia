@@ -1,4 +1,5 @@
 import uuid
+
 import httpx
 import pytest
 
@@ -34,7 +35,7 @@ def valid_nit(seed_nits) -> str:
 @pytest.fixture(scope="session")
 def proceso_payload() -> dict:
     return {
-        "cliente_nit": "800098911-8",
+        "entidad_nit": "800098911-8",
         "nombre": f"Test Proceso {uuid.uuid4().hex[:8]}",
         "vigencia_ini": "2024-01-01",
         "vigencia_fin": "2024-12-31",
@@ -56,7 +57,7 @@ def campana_payload() -> dict:
 @pytest.fixture(scope="session")
 def hallazgo_payload(valid_nit) -> dict:
     return {
-        "nit": valid_nit,
+        "contribuyente_nit": valid_nit,
         "regla": "SUBDECLARACION",
         "periodo": "2024",
         "tipo_hallazgo": "SUBDECLARACION_ICA",
@@ -77,7 +78,7 @@ def hallazgo_payload(valid_nit) -> dict:
 @pytest.fixture(scope="session")
 def fiscalizacion_payload(valid_nit) -> dict:
     return {
-        "nit": valid_nit,
+        "contribuyente_nit": valid_nit,
         "periodo": "2024",
         "reglas": ["SUBDECLARACION", "OMISION_TOTAL"],
         "declaraciones_ica": [

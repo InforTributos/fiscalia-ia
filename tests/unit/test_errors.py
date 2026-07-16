@@ -16,7 +16,7 @@ def test_errors_retorna_200(mock_errores, mock_proceso):
              "contexto": None, "created_at": None},
         ],
         [
-            {"nit": "9003189639", "capa": "PROCESO", "codigo": "ANALISIS_FAIL", "mensaje": "Error en LLM",
+            {"contribuyente_nit": "9003189639", "capa": "PROCESO", "codigo": "ANALISIS_FAIL", "mensaje": "Error en LLM",
              "contexto": None, "created_at": None},
         ],
     )

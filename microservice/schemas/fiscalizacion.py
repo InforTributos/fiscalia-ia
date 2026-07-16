@@ -14,7 +14,7 @@ class EvidenciaInput(BaseModel):
 
 
 class CrearHallazgoRequest(BaseModel):
-    nit: str
+    contribuyente_nit: str
     regla: str
     periodo: str
     tipo_hallazgo: str | None = None
@@ -24,12 +24,14 @@ class CrearHallazgoRequest(BaseModel):
     reincidencia: int = 0
     corroboracion: int = 1
     resumen: str | None = None
+    proceso_id: UUID | None = None
+    entidad_id: UUID | None = None
     metadata: dict = Field(default_factory=dict)
     evidencias: list[EvidenciaInput] = Field(default_factory=list)
 
 
 class PerfilFiscalRequest(BaseModel):
-    nit: str
+    contribuyente_nit: str
     periodo: str
     reglas: list[str] | None = None
     declaraciones_ica: list[dict] = Field(default_factory=list)
@@ -89,7 +91,7 @@ class RevisionAgenteResponse(BaseModel):
 
 class HallazgoResponse(BaseModel):
     id: UUID
-    nit: str
+    contribuyente_nit: str
     regla: str
     periodo: str
     tipo_hallazgo: str
@@ -102,6 +104,8 @@ class HallazgoResponse(BaseModel):
     accionable: bool
     estado: str
     resumen: str | None = None
+    proceso_id: UUID | None = None
+    entidad_id: UUID | None = None
     metadata: dict = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime

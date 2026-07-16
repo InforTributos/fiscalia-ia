@@ -67,7 +67,7 @@ async def exportar_resultados(
         )
 
         valores = [
-            r.get("nit", ""),
+            r.get("contribuyente_nit", ""),
             r.get("razon_social", ""),
             r.get("ciiu", ""),
             r.get("clasificacion", ""),

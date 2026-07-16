@@ -30,7 +30,7 @@ def mock_pool(mock_conn):
 @pytest.fixture
 def minimal_hallazgo_data():
     return {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "regla": "SRF-001",
         "periodo": "2024",
         "tipo_hallazgo": "OMISO",
@@ -70,10 +70,10 @@ async def test_crear_hallazgo_con_evidencias(mock_get_pool, mock_pool, minimal_h
 async def test_crear_hallazgo_con_todos_los_campos(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
-    conn.fetchrow.return_value = {"id": 3, "nit": "9003189639"}
+    conn.fetchrow.return_value = {"id": 3, "contribuyente_nit": "9003189639"}
 
     data = {
-        "nit": "9003189639",
+        "contribuyente_nit": "9003189639",
         "regla": "SRF-002",
         "periodo": "2024",
         "tipo_hallazgo": "INEXACTO",
@@ -178,9 +178,9 @@ async def test_listar_hallazgos_filtro_nit(mock_get_pool, mock_pool):
     pool, conn = mock_pool
     mock_get_pool.return_value = pool
     conn.fetchval.return_value = 1
-    conn.fetch.return_value = [{"id": 1, "nit": "9003189639"}]
+    conn.fetch.return_value = [{"id": 1, "contribuyente_nit": "9003189639"}]
 
-    total, rows = await hallazgos_queries.listar_hallazgos(nit="9003189639")
+    total, rows = await hallazgos_queries.listar_hallazgos(contribuyente_nit="9003189639")
     assert total == 1
 
 

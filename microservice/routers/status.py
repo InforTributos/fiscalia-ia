@@ -18,7 +18,7 @@ async def consultar_status(proceso_id: uuid.UUID):
     intento_actual = await repo.obtener_ultimo_intento(proceso_id)
     historial_rows = await repo.obtener_historial_intentos(proceso_id)
 
-    cliente = await repo.obtener_cliente_por_id(proceso["cliente_id"]) if proceso.get("cliente_id") else None
+    entidad = await repo.obtener_entidad_por_id(proceso["entidad_id"]) if proceso.get("entidad_id") else None
 
     intento_actual_dto = None
     if intento_actual:
@@ -39,7 +39,6 @@ async def consultar_status(proceso_id: uuid.UUID):
                 started_at=h.get("started_at"),
             ))
 
-    total = proceso.get("total_nits", 0) or 0
     candidatos = proceso.get("candidatos", 0) or 0
     procesados = (intento_actual["procesados"] or 0) if intento_actual else 0
     faltantes = candidatos - procesados if candidatos > procesados else 0
@@ -48,7 +47,7 @@ async def consultar_status(proceso_id: uuid.UUID):
     return StatusResponse(
         proceso_id=proceso_id,
         estado=proceso["estado"],
-        cliente_nit=cliente["nit"] if cliente else "",
+        entidad_nit=entidad["nit"] if entidad else "",
         intento_actual=intento_actual_dto,
         intentos_historial=historial,
         progreso=Progreso(

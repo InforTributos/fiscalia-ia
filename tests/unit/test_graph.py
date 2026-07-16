@@ -4,9 +4,9 @@ from domain.graph.taxpayer_graph import build_taxpayer_graph, graph_to_dict
 
 
 def _make_graph():
-    contrib = {"nit": "123", "razon_social": "Test", "ciiu": "1234", "regimen": "GENERAL"}
+    contrib = {"contribuyente_nit": "123", "razon_social": "Test", "ciiu": "1234", "regimen": "GENERAL"}
     relacionados = {
-        "representante": [{"nit": "456", "razon_social": "Other", "ciiu": "1234"}],
+        "representante": [{"contribuyente_nit": "456", "razon_social": "Other", "ciiu": "1234"}],
         "direccion": [],
         "telefono": [],
         "correo": [],
@@ -31,7 +31,7 @@ def test_graph_to_dict():
 def test_network_score_with_connections():
     from domain.graph.models import GraphEdge, GraphNode
     graph = TaxpayerGraph(
-        nit="123",
+        contribuyente_nit="123",
         nodes=[
             GraphNode(id="empresa:123", tipo="EMPRESA", label="Test"),
             GraphNode(id="empresa:456", tipo="EMPRESA", label="Other"),
@@ -47,7 +47,7 @@ def test_network_score_with_connections():
 
 
 def test_network_score_without_connections():
-    graph = TaxpayerGraph(nit="123", nodes=[], edges=[])
+    graph = TaxpayerGraph(contribuyente_nit="123", nodes=[], edges=[])
     result = calcular_riesgo_red(graph, score_comportamental=0.0)
     assert result["score_red"] == 0.0
     assert result["empresas_conectadas"] == 0

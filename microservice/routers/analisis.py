@@ -22,14 +22,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/analizar/{nit}", response_model=AnalyzeResponse)
+@router.post("/analizar/{contribuyente_nit}", response_model=AnalyzeResponse)
 async def analizar_contribuyente(
-    nit: str,
+    contribuyente_nit: str,
     periodo: str = "2024",
 ):
     inicio = time.time()
     cache = get_cache()
-    cache_key = f"analisis:{nit}:{periodo}"
+    cache_key = f"analisis:{contribuyente_nit}:{periodo}"
 
     cached = cache.obtener(cache_key)
     if cached is not None:
@@ -37,9 +37,9 @@ async def analizar_contribuyente(
         return AnalyzeResponse(**cached)
 
     client = OracleClient()
-    datos = await obtener_datos_fiscales(client, nit, periodo)
+    datos = await obtener_datos_fiscales(client, contribuyente_nit, periodo)
     if not datos:
-        raise NITNoEncontradoError(nit)
+        raise NITNoEncontradoError(contribuyente_nit)
 
     clasificacion = clasificar_por_datos(datos)
     inconsistencias = extraer_inconsistencias(datos)
@@ -67,7 +67,7 @@ async def analizar_contribuyente(
         tokens_out = resultado_llm.get("tokens_salida", 0)
         provider = resultado_llm.get("provider", "")
     except Exception as e:
-        logger.warning("Error invocando LLM para NIT %s: %s", nit, str(e))
+        logger.warning("Error invocando LLM para NIT %s: %s", contribuyente_nit, str(e))
 
     duracion_ms = int((time.time() - inicio) * 1000)
     nivel = nivel_riesgo(srf_total)
@@ -77,7 +77,7 @@ async def analizar_contribuyente(
     ]
 
     response = AnalyzeResponse(
-        nit=nit,
+        contribuyente_nit=contribuyente_nit,
         razon_social=datos.get("razon_social", ""),
         ciiu=datos.get("ciiu", ""),
         clasificacion=clasificacion,

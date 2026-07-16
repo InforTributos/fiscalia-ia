@@ -44,7 +44,7 @@ def test_409_proceso_duplicado_activo(client: TestClient, mock_router_repo):
         "id": uuid.uuid4(), "estado": "EN_PROCESO", "nombre": "Existente"
     })):
         resp = client.post("/api/v1/proceso", json={
-            "cliente_nit": "9003189639", "nombre": "Duplicado",
+            "entidad_nit": "9003189639", "nombre": "Duplicado",
             "vigencia_ini": "2024-01-01", "vigencia_fin": "2024-12-31",
             "tipo_regimen": "COMUN", "actividades_economicas": ["4711"], "periodo": "2024",
         })

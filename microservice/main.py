@@ -11,7 +11,7 @@ from middleware.rate_limiter import RateLimiterMiddleware
 logger = logging.getLogger(__name__)
 from routers.analisis import router as analisis_router
 from routers.behavioral import router as behavioral_router
-from routers.campana import router as campana_router
+from routers.entidad import router as entidad_router
 from routers.errors import router as errors_router
 from routers.export import router as export_router
 from routers.fiscalizacion import router as fiscalizacion_router
@@ -60,10 +60,10 @@ app.include_router(proceso_router, prefix="/api/v1", tags=["proceso"])
 app.include_router(status_router, prefix="/api/v1", tags=["proceso"])
 app.include_router(results_router, prefix="/api/v1", tags=["proceso"])
 app.include_router(errors_router, prefix="/api/v1", tags=["proceso"])
+app.include_router(entidad_router, prefix="/api/v1", tags=["entidad"])
 app.include_router(analisis_router, prefix="/api/v1", tags=["analisis"])
 app.include_router(behavioral_router, prefix="/api/v1", tags=["comportamiento"])
 app.include_router(fiscalizacion_router, prefix="/api/v1", tags=["fiscalizacion"])
-app.include_router(campana_router, prefix="/api/v1", tags=["campana"])
 app.include_router(export_router, prefix="/api/v1", tags=["export"])
 
 

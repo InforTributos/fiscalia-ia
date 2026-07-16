@@ -52,7 +52,7 @@ def mock_router_repo():
     from routers.proceso import repo as real_repo
 
     with (
-        patch.object(real_repo, "obtener_cliente_por_nit", AsyncMock(return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT})),
+        patch.object(real_repo, "obtener_entidad_por_nit", AsyncMock(return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT})),
         patch.object(real_repo, "obtener_proceso_por_criteria", AsyncMock(return_value=None)),
         patch.object(real_repo, "crear_proceso", AsyncMock(return_value=VALID_PROCESO_ID)),
         patch.object(real_repo, "crear_intento", AsyncMock(return_value=1)),
@@ -86,7 +86,7 @@ def test_posta_proceso_retorna_201(client, mock_router_repo):
     assert data["proceso_id"] == str(VALID_PROCESO_ID)
     assert data["intento_id"] == 1
     assert data["nombre"] == "Test proceso"
-    assert data["cliente_nit"] == VALID_CLIENTE_NIT
+    assert data["entidad_nit"] == VALID_CLIENTE_NIT
     assert data["proceso_analisis"]["estado"] == "EN_COLA"
     assert "resumen" in data
 
@@ -112,28 +112,20 @@ def test_posta_proceso_lanza_background_task(client, mock_router_repo):
 
 
 # =====================================================================
-# Test: Creación de cliente automática
+# Test: Rechazo si entidad no existe
 # =====================================================================
 
 
-def test_posta_proceso_crea_cliente_si_no_existe(client):
-    """Si el cliente no existe, lo crea automáticamente."""
-    cliente_id_nuevo = uuid.uuid4()
-
+def test_posta_proceso_rechaza_si_entidad_no_existe(client):
+    """Si la entidad no existe, rechaza con 404."""
     with (
-        patch("routers.proceso.repo.obtener_cliente_por_nit", return_value=None),
-        patch("routers.proceso.repo.crear_cliente", return_value=cliente_id_nuevo) as mock_crear,
+        patch("routers.proceso.repo.obtener_entidad_por_nit", return_value=None),
         patch("routers.proceso.repo.obtener_proceso_por_criteria", return_value=None),
-        patch("routers.proceso.repo.crear_proceso", return_value=VALID_PROCESO_ID),
-        patch("routers.proceso.repo.crear_intento", return_value=1),
-        patch("routers.proceso.repo.actualizar_estado_proceso"),
-        patch("routers.proceso.repo.actualizar_estado_intento"),
         patch("routers.proceso.analizar_proceso"),
     ):
-        response = post_proceso(client, nit_cliente="9999999999")
+        response = post_proceso(client, nit_entidad="9999999999")
 
-    assert response.status_code == 201
-    mock_crear.assert_called_once_with("9999999999", "9999999999")
+    assert response.status_code == 404
 
 
 # =====================================================================
@@ -150,7 +142,7 @@ def test_posta_proceso_rechaza_duplicado_activo(client):
     }
 
     with (
-        patch("routers.proceso.repo.obtener_cliente_por_nit", return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT}),
+        patch("routers.proceso.repo.obtener_entidad_por_nit", return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT}),
         patch("routers.proceso.repo.obtener_proceso_por_criteria", return_value=proceso_existente),
         patch("routers.proceso.analizar_proceso"),
     ):
@@ -159,13 +151,13 @@ def test_posta_proceso_rechaza_duplicado_activo(client):
     assert response.status_code == 409
 
 
-@pytest.mark.parametrize("estado_activo", ["PENDIENTE", "EN_COLA", "PREFILTRANDO"])
+@ pytest.mark.parametrize("estado_activo", ["PENDIENTE", "EN_COLA", "PREFILTRANDO"])
 def test_posta_proceso_rechaza_estados_activos(client, estado_activo):
     """Cualquier estado activo → 409."""
     proceso_existente = {"id": uuid.uuid4(), "estado": estado_activo, "nombre": "Existente"}
 
     with (
-        patch("routers.proceso.repo.obtener_cliente_por_nit", return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT}),
+        patch("routers.proceso.repo.obtener_entidad_por_nit", return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT}),
         patch("routers.proceso.repo.obtener_proceso_por_criteria", return_value=proceso_existente),
         patch("routers.proceso.analizar_proceso"),
     ):
@@ -189,7 +181,7 @@ def test_posta_proceso_reintento_con_nuevo_intento(client, estado_previo):
     }
 
     with (
-        patch("routers.proceso.repo.obtener_cliente_por_nit", return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT}),
+        patch("routers.proceso.repo.obtener_entidad_por_nit", return_value={"id": uuid.uuid4(), "nit": VALID_CLIENTE_NIT}),
         patch("routers.proceso.repo.obtener_proceso_por_criteria", return_value=proceso_existente),
         patch("routers.proceso.repo.crear_proceso", return_value=VALID_PROCESO_ID),
         patch("routers.proceso.repo.crear_intento", return_value=2) as mock_intento,
@@ -211,13 +203,13 @@ def test_posta_proceso_reintento_con_nuevo_intento(client, estado_previo):
 
 
 @pytest.mark.parametrize("missing_field", [
-    "cliente_nit", "nombre", "vigencia_ini", "vigencia_fin",
+    "entidad_nit", "nombre", "vigencia_ini", "vigencia_fin",
     "tipo_regimen", "actividades_economicas", "periodo",
 ])
 def test_posta_proceso_requiere_campos_obligatorios(client, missing_field):
     """Campos obligatorios faltantes → 422."""
     payload = {
-        "cliente_nit": "9003189639",
+        "entidad_nit": "9003189639",
         "nombre": "Test",
         "vigencia_ini": "2024-01-01",
         "vigencia_fin": "2024-12-31",
@@ -251,8 +243,8 @@ async def test_flujo_completo_con_candidatos_mixtos():
     mock_repo.insertar_error_detalle = AsyncMock()
     mock_repo.actualizar_progreso_intento = AsyncMock()
     mock_repo.listar_proceso_detalle = AsyncMock(return_value=(2, [
-        {"id": 1, "nit": "9003189639", "clasificacion": "OMISO"},
-        {"id": 2, "nit": "9012345678", "clasificacion": "INEXACTO"},
+        {"id": 1, "contribuyente_nit": "9003189639", "clasificacion": "OMISO"},
+        {"id": 2, "contribuyente_nit": "9012345678", "clasificacion": "INEXACTO"},
     ]))
 
     mock_orch = MagicMock()
@@ -306,17 +298,17 @@ async def test_flujo_completo_con_candidatos_mixtos():
     # Verificar inserción de candidatos
     assert mock_repo.insertar_detalle.call_count == 2
     insert_calls = [c[1] for c in mock_repo.insertar_detalle.call_args_list]
-    nits_insertados = [c["nit"] for c in insert_calls]
+    nits_insertados = [c["contribuyente_nit"] for c in insert_calls]
     assert "9003189639" in nits_insertados
     assert "9012345678" in nits_insertados
 
     # Verificar clasificaciones correctas
-    clasificaciones = {c["nit"]: c["clasificacion"] for c in insert_calls}
+    clasificaciones = {c["contribuyente_nit"]: c["clasificacion"] for c in insert_calls}
     assert clasificaciones["9003189639"] == "OMISO"
     assert clasificaciones["9012345678"] == "INEXACTO"
 
     # Verificar razón MCP
-    tipos_mcp = {c["nit"]: c["mcp_razon"] for c in insert_calls}
+    tipos_mcp = {c["contribuyente_nit"]: c["mcp_razon"] for c in insert_calls}
     assert tipos_mcp["9003189639"] == "OMISO_CONOCIDO"
     assert tipos_mcp["9012345678"] == "INEXACTO_CIIU"
 
@@ -380,7 +372,7 @@ async def test_flujo_con_error_parcial_en_generador():
     mock_repo.insertar_error_detalle = AsyncMock()
     mock_repo.actualizar_progreso_intento = AsyncMock()
     mock_repo.listar_proceso_detalle = AsyncMock(return_value=(1, [
-        {"id": 1, "nit": "9003189639", "clasificacion": "INEXACTO"},
+        {"id": 1, "contribuyente_nit": "9003189639", "clasificacion": "INEXACTO"},
     ]))
 
     mock_orch = MagicMock()
@@ -425,9 +417,9 @@ async def test_flujo_con_error_parcial_en_generador():
 # =====================================================================
 
 
-def post_proceso(client_obj, nit_cliente=VALID_CLIENTE_NIT):
+def post_proceso(client_obj, nit_entidad=VALID_CLIENTE_NIT):
     return client_obj.post("/api/v1/proceso", json={
-        "cliente_nit": nit_cliente,
+        "entidad_nit": nit_entidad,
         "nombre": "Test proceso",
         "vigencia_ini": "2024-01-01",
         "vigencia_fin": "2024-12-31",

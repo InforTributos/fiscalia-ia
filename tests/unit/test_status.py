@@ -9,12 +9,12 @@ client = TestClient(app)
 @patch("infrastructure.persistence.queries.obtener_proceso")
 @patch("infrastructure.persistence.queries.obtener_ultimo_intento")
 @patch("infrastructure.persistence.queries.obtener_historial_intentos")
-@patch("infrastructure.persistence.queries.obtener_cliente_por_id")
-def test_status_retorna_200(mock_cliente, mock_historial, mock_ultimo, mock_proceso):
+@patch("infrastructure.persistence.queries.obtener_entidad_por_id")
+def test_status_retorna_200(mock_entidad, mock_historial, mock_ultimo, mock_proceso):
     mock_proceso.return_value = {
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "estado": "COMPLETADO",
-        "cliente_id": 1,
+        "entidad_id": 1,
         "total_nits": 10,
         "candidatos": 5,
         "omisos": 3,
@@ -29,7 +29,7 @@ def test_status_retorna_200(mock_cliente, mock_historial, mock_ultimo, mock_proc
         "completed_at": None,
     }
     mock_historial.return_value = []
-    mock_cliente.return_value = {"nit": "9003189639"}
+    mock_entidad.return_value = {"nit": "9003189639"}
 
     response = client.get("/api/v1/proceso/550e8400-e29b-41d4-a716-446655440000/status")
     assert response.status_code == 200

@@ -159,7 +159,7 @@ def _evaluar_r10(perfil: dict) -> dict | None:
 def _hallazgo(perfil: dict, regla: str, tipo: str, brecha: float, impuesto: float, resumen: str, evidencia) -> dict:
     catalog = obtener_regla(regla)
     return {
-        "nit": perfil["nit"],
+        "contribuyente_nit": perfil["contribuyente_nit"],
         "regla": regla,
         "periodo": perfil["periodo"],
         "tipo_hallazgo": tipo,
@@ -169,7 +169,7 @@ def _hallazgo(perfil: dict, regla: str, tipo: str, brecha: float, impuesto: floa
         "resumen": resumen,
         "evidencias": [{
             "fuente": catalog.nombre.upper().replace(" ", "_"),
-            "referencia_registro": f"{perfil['nit']}:{perfil['periodo']}:{regla}",
+            "referencia_registro": f"{perfil['contribuyente_nit']}:{perfil['periodo']}:{regla}",
             "descripcion": resumen,
             "snapshot": evidencia if isinstance(evidencia, dict) else {"items": evidencia},
         }],

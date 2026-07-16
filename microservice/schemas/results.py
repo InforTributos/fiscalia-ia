@@ -18,7 +18,7 @@ class HallazgoResult(BaseModel):
 
 
 class ResultadoDetalle(BaseModel):
-    nit: str
+    contribuyente_nit: str
     razon_social: str | None = None
     ciiu: str | None = None
     clasificacion: str

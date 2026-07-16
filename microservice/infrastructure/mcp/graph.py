@@ -16,8 +16,8 @@ class OracleGraphRepository:
     def __init__(self, client: OracleClient | None = None):
         self.client = client or OracleClient()
 
-    async def obtener_contribuyente(self, nit: str) -> dict | None:
-        rows = await self.client.execute_sql(TARGET_SQL, {"nit": nit})
+    async def obtener_contribuyente(self, contribuyente_nit: str) -> dict | None:
+        rows = await self.client.execute_sql(TARGET_SQL, {"nit": contribuyente_nit})
         if not rows:
             return None
         return _normalizar_atributos(rows[0])
@@ -44,7 +44,7 @@ class OracleGraphRepository:
             """
             rows = await self.client.execute_sql(sql, {
                 "valor": valor,
-                "nit": contribuyente.get("nit", ""),
+                "nit": contribuyente.get("contribuyente_nit", ""),
                 "limit": limit,
             })
             relacionados[atributo] = [_normalizar_atributos(row) for row in rows]

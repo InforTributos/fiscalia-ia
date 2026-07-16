@@ -15,7 +15,7 @@ class ErrorProceso(BaseModel):
 
 
 class ErrorDetalle(BaseModel):
-    nit: str
+    contribuyente_nit: str
     capa: str
     codigo: str
     mensaje: str
@@ -34,4 +34,4 @@ class ErrorsResponse(BaseModel):
 class ErrorsQueryParams(BaseModel):
     intento_id: int | None = None
     capa: str | None = None
-    nit: str | None = None
+    contribuyente_nit: str | None = None

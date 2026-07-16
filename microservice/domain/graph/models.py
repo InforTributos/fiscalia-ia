@@ -22,7 +22,7 @@ class GraphEdge:
 
 @dataclass(frozen=True)
 class TaxpayerGraph:
-    nit: str
+    contribuyente_nit: str
     nodes: list[GraphNode]
     edges: list[GraphEdge]
 

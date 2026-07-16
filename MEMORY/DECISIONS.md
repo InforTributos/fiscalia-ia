@@ -250,7 +250,7 @@ tags: [decisions, architecture]
 | **Fecha** | F-03 |
 | **Estado** | ✅ Implementado — `routers/proceso.py:crear_proceso()` + `queries.obtener_proceso_por_criteria()` (actualizado 2026-07-08, esta entrada estaba desactualizada) |
 
-**Decisión:** Mismo `cliente_id` + mismos `criteria` → nuevo intento con `numero_intento` incremental.
+**Decisión:** Mismo `entidad_id` + mismos `criteria` → nuevo intento con `numero_intento` incremental.
 
 **Comportamiento implementado:**
 - Proceso `EN_PROCESO`/`EN_COLA`/`PREFILTRANDO`/`PENDIENTE` con mismos criteria → rechazar con 409 `ProcesoEnProcesoError`

@@ -13,7 +13,7 @@ BONUS_BY_EDGE = {
 
 
 def calcular_riesgo_red(graph: TaxpayerGraph, score_comportamental: float = 0.0) -> dict:
-    target_id = f"empresa:{graph.nit}"
+    target_id = f"empresa:{graph.contribuyente_nit}"
     bonus = 0.0
     motivos: list[str] = []
     empresas_conectadas: set[str] = set()

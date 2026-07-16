@@ -23,17 +23,21 @@ class ProcesoOrchestrator:
         self.proceso_repo = proceso_repo or PostgresProcesoRepo()
 
     async def ejecutar(
-        self, proceso_id: str, intento_id: int, nit: str, detalle_id: int,
+        self, proceso_id: str, intento_id: int, contribuyente_nit: str, detalle_id: int,
         periodo: str = "2024", datos: dict | None = None,
     ):
-        logger.info("Orquestador: analizando NIT %s (detalle %d, periodo %s)", nit, detalle_id, periodo)
+        logger.info("Orquestador: analizando NIT %s (detalle %d, periodo %s)", contribuyente_nit, detalle_id, periodo)
 
         try:
             if not datos:
                 client = OracleClient()
-                datos = await obtener_datos_fiscales(client, nit, periodo)
+                datos = await obtener_datos_fiscales(client, contribuyente_nit, periodo)
             if not datos:
-                logger.warning("NIT %s sin datos fiscales disponibles", nit)
+                logger.warning("NIT %s sin datos fiscales disponibles", contribuyente_nit)
+                await self.proceso_repo.actualizar_estado_detalle(
+                    detalle_id,
+                    mensaje="Sin datos fiscales disponibles en Oracle para este NIT y periodo",
+                )
                 return
 
             clasificacion = clasificar_por_datos(datos)
@@ -43,12 +47,12 @@ class ProcesoOrchestrator:
             elif clasificacion == "INEXACTO":
                 await self._procesar_inexacto(detalle_id, datos)
             else:
-                logger.info("NIT %s clasificado como EXACTO — sin análisis IA", nit)
+                logger.info("NIT %s clasificado como EXACTO — sin análisis IA", contribuyente_nit)
 
         except Exception as e:
-            logger.error("Error analizando NIT %s: %s", nit, str(e))
+            logger.error("Error analizando NIT %s: %s", contribuyente_nit, str(e))
             await self.proceso_repo.insertar_error_detalle(
-                uuid.UUID(proceso_id), detalle_id, nit, "PROCESO", "ORCHESTRATION_FAIL", str(e),
+                uuid.UUID(proceso_id), detalle_id, contribuyente_nit, "PROCESO", "ORCHESTRATION_FAIL", str(e),
             )
 
     async def _procesar_omiso(self, detalle_id: int, datos: dict):
@@ -98,8 +102,11 @@ class ProcesoOrchestrator:
                 )},
             ]
             resultado = await self.llm.analyze(messages)
+            explicacion = resultado.get("explicacion", resultado.get("respuesta_plana", ""))
+            if len(explicacion) > 2000:
+                explicacion = explicacion[:2000] + "..."
             return {
-                "explicacion": resultado.get("explicacion", resultado.get("respuesta_plana", "")),
+                "explicacion": explicacion,
                 "tokens_entrada": resultado.get("tokens_entrada", 0),
                 "tokens_salida": resultado.get("tokens_salida", 0),
                 "costo_estimado": resultado.get("costo_estimado", 0.0),

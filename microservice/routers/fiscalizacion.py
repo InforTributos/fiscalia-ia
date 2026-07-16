@@ -32,32 +32,42 @@ async def evaluar_reglas_fiscales(request: PerfilFiscalRequest):
     return {"total": len(resultados), "resultados": resultados}
 
 
-@router.post("/fiscalizacion/reglas/evaluar/{nit}", response_model=EvaluacionReglasResponse)
+@router.post("/fiscalizacion/reglas/evaluar/{contribuyente_nit}", response_model=EvaluacionReglasResponse)
 async def evaluar_reglas_fiscales_por_nit(
-    nit: str,
+    contribuyente_nit: str,
     periodo: str = "2024",
     reglas: list[str] | None = Query(None),
 ):
-    perfil = await _perfil_desde_contrato_original(nit=nit, periodo=periodo, reglas=reglas)
+    perfil = await _perfil_desde_contrato_original(contribuyente_nit=contribuyente_nit, periodo=periodo, reglas=reglas)
     resultados = await AplicarReglasFiscalesUseCase().evaluar(perfil, reglas=reglas)
     return {"total": len(resultados), "resultados": resultados}
 
 
 @router.post("/fiscalizacion/reglas/ejecutar", response_model=list[HallazgoResponse], status_code=201)
-async def ejecutar_reglas_fiscales(request: PerfilFiscalRequest):
+async def ejecutar_reglas_fiscales(
+    request: PerfilFiscalRequest,
+    proceso_id: uuid.UUID | None = None,
+    entidad_id: uuid.UUID | None = None,
+):
     payload = request.model_dump()
     reglas = payload.pop("reglas", None)
-    return await AplicarReglasFiscalesUseCase().ejecutar(payload, reglas=reglas)
+    return await AplicarReglasFiscalesUseCase().ejecutar(
+        payload, reglas=reglas, proceso_id=proceso_id, entidad_id=entidad_id,
+    )
 
 
-@router.post("/fiscalizacion/reglas/ejecutar/{nit}", response_model=list[HallazgoResponse], status_code=201)
+@router.post("/fiscalizacion/reglas/ejecutar/{contribuyente_nit}", response_model=list[HallazgoResponse], status_code=201)
 async def ejecutar_reglas_fiscales_por_nit(
-    nit: str,
+    contribuyente_nit: str,
     periodo: str = "2024",
     reglas: list[str] | None = Query(None),
+    proceso_id: uuid.UUID | None = None,
+    entidad_id: uuid.UUID | None = None,
 ):
-    perfil = await _perfil_desde_contrato_original(nit=nit, periodo=periodo, reglas=reglas)
-    return await AplicarReglasFiscalesUseCase().ejecutar(perfil, reglas=reglas)
+    perfil = await _perfil_desde_contrato_original(contribuyente_nit=contribuyente_nit, periodo=periodo, reglas=reglas)
+    return await AplicarReglasFiscalesUseCase().ejecutar(
+        perfil, reglas=reglas, proceso_id=proceso_id, entidad_id=entidad_id,
+    )
 
 
 @router.post("/fiscalizacion/hallazgos", response_model=HallazgoResponse, status_code=201)
@@ -65,20 +75,20 @@ async def crear_hallazgo(request: CrearHallazgoRequest):
     return await GestionarHallazgosUseCase().crear_hallazgo(request.model_dump())
 
 
-@router.post("/fiscalizacion/hallazgos/desde-grafo/{nit}", response_model=HallazgoResponse, status_code=201)
+@router.post("/fiscalizacion/hallazgos/desde-grafo/{contribuyente_nit}", response_model=HallazgoResponse, status_code=201)
 async def crear_hallazgo_desde_grafo(
-    nit: str,
+    contribuyente_nit: str,
     periodo: str = "2024",
     min_pares: int = Query(10, ge=3, le=100),
 ):
-    return await GestionarHallazgosUseCase().crear_desde_grafo(nit=nit, periodo=periodo, min_pares=min_pares)
+    return await GestionarHallazgosUseCase().crear_desde_grafo(contribuyente_nit=contribuyente_nit, periodo=periodo, min_pares=min_pares)
 
 
 @router.get("/fiscalizacion/hallazgos", response_model=ListaHallazgosResponse)
 async def listar_hallazgos(
     estado: str | None = None,
     regla: str | None = None,
-    nit: str | None = None,
+    contribuyente_nit: str | None = None,
     accionable: bool | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -86,7 +96,7 @@ async def listar_hallazgos(
     total, rows = await GestionarHallazgosUseCase().listar(
         estado=estado,
         regla=regla,
-        nit=nit,
+        nit=contribuyente_nit,
         accionable=accionable,
         page=page,
         page_size=page_size,
@@ -117,9 +127,9 @@ async def revisar_hallazgo_con_agente(hallazgo_id: uuid.UUID, request: RevisionA
     )
 
 
-async def _perfil_desde_contrato_original(nit: str, periodo: str, reglas: list[str] | None = None) -> dict:
+async def _perfil_desde_contrato_original(contribuyente_nit: str, periodo: str, reglas: list[str] | None = None) -> dict:
     client = OracleClient()
-    datos = await obtener_datos_fiscales(client, nit, periodo)
+    datos = await obtener_datos_fiscales(client, contribuyente_nit, periodo)
     if not datos:
-        raise NITNoEncontradoError(nit)
+        raise NITNoEncontradoError(contribuyente_nit)
     return construir_perfil_fiscal_desde_datos_originales(datos, periodo=periodo, reglas=reglas)

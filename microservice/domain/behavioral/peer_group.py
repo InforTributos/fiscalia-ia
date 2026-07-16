@@ -7,7 +7,7 @@ from domain.behavioral.indicators import median, percentile, safe_ratio, to_floa
 
 @dataclass(frozen=True)
 class ContributorMetrics:
-    nit: str
+    contribuyente_nit: str
     razon_social: str
     ciiu: str
     regimen: str
@@ -39,7 +39,7 @@ def build_contributor_metrics(row: dict, vigencia: str) -> ContributorMetrics:
     impuesto = to_float(row.get("impuesto"))
     exogena = to_float(row.get("ingresos_exogena", row.get("ingresos")))
     return ContributorMetrics(
-        nit=str(row.get("nit", "")),
+        contribuyente_nit=str(row.get("contribuyente_nit", "")),
         razon_social=str(row.get("razon_social", "")),
         ciiu=str(row.get("ciiu", "")),
         regimen=str(row.get("regimen", row.get("tipo_regimen", ""))),

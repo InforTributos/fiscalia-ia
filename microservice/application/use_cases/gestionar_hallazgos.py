@@ -31,7 +31,7 @@ class GestionarHallazgosUseCase:
         )
         accionable = ventana.es_accionable(date.today(), omiso)
         data = {
-            "nit": payload["nit"],
+            "contribuyente_nit": payload["contribuyente_nit"],
             "regla": regla.codigo,
             "periodo": payload["periodo"],
             "tipo_hallazgo": tipo_hallazgo,
@@ -46,15 +46,18 @@ class GestionarHallazgosUseCase:
             "resumen": payload.get("resumen") or regla.descripcion,
             "metadata": payload.get("metadata", {}),
         }
+        if payload.get("proceso_id") and payload.get("entidad_id"):
+            data["proceso_id"] = payload["proceso_id"]
+            data["entidad_id"] = payload["entidad_id"]
         return await hallazgos_queries.crear_hallazgo(data, payload.get("evidencias") or [])
 
-    async def crear_desde_grafo(self, nit: str, periodo: str, min_pares: int = 10) -> dict:
-        expediente = await GenerarExpedienteFiscalUseCase().generar(nit=nit, periodo=periodo, min_pares=min_pares)
+    async def crear_desde_grafo(self, contribuyente_nit: str, periodo: str, min_pares: int = 10) -> dict:
+        expediente = await GenerarExpedienteFiscalUseCase().generar(contribuyente_nit=contribuyente_nit, periodo=periodo, min_pares=min_pares)
         analisis = expediente.get("analisis_comportamental") or {}
         metricas = analisis.get("metricas") or {}
         brecha = max((metricas.get("ingresos_exogena") or 0) - (metricas.get("base_gravable") or 0), 0)
         payload = {
-            "nit": nit,
+            "contribuyente_nit": contribuyente_nit,
             "regla": "R8",
             "periodo": periodo,
             "tipo_hallazgo": "INEXACTO_INDICIARIO",
@@ -69,7 +72,7 @@ class GestionarHallazgosUseCase:
             "evidencias": [
                 {
                     "fuente": "EXPEDIENTE_FISCAL",
-                    "referencia_registro": f"{nit}:{periodo}",
+                    "referencia_registro": f"{contribuyente_nit}:{periodo}",
                     "descripcion": "Expediente fiscal automatico generado desde grafo y comportamiento.",
                     "snapshot": expediente,
                 }

@@ -20,15 +20,15 @@ class AnalizarComportamientoUseCase:
 
     async def analizar_nit(
         self,
-        nit: str,
+        contribuyente_nit: str,
         periodo: str,
         ciiu: str | None = None,
         regimen: str | None = None,
         min_pares: int = 10,
     ) -> dict:
-        row = await self.behavioral_repo.obtener_contribuyente(nit, periodo)
+        row = await self.behavioral_repo.obtener_contribuyente(contribuyente_nit, periodo)
         if not row:
-            raise NITNoEncontradoError(nit)
+            raise NITNoEncontradoError(contribuyente_nit)
 
         contribuyente = build_contributor_metrics(row, periodo)
         ciiu_ref = ciiu or contribuyente.ciiu
@@ -68,13 +68,13 @@ class AnalizarComportamientoUseCase:
         resultados = []
         errores = []
         for detalle in detalles:
-            nit = detalle.get("nit")
-            if not nit:
+            contribuyente_nit = detalle.get("contribuyente_nit")
+            if not contribuyente_nit:
                 continue
             try:
-                analisis = await self.analizar_nit(str(nit), str(periodo_ref), min_pares=min_pares)
+                analisis = await self.analizar_nit(str(contribuyente_nit), str(periodo_ref), min_pares=min_pares)
             except Exception as exc:
-                errores.append({"nit": nit, "mensaje": str(exc)})
+                errores.append({"contribuyente_nit": contribuyente_nit, "mensaje": str(exc)})
                 continue
             if analisis["score_comportamental"] >= min_score:
                 resultados.append(analisis)
