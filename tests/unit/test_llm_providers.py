@@ -583,6 +583,33 @@ class TestNvidiaNIMProviderDiscovery:
 
         assert models == []
 
+    @patch("infrastructure.llm.nvidia_nim_provider.settings")
+    @patch("infrastructure.llm.nvidia_nim_provider.AsyncOpenAI")
+    async def test_ensure_model_uses_discovery_when_no_model(self, mock_openai_cls, mock_settings):
+        _default_settings(mock_settings)
+        mock_settings.llm_tier2_model = ""
+
+        mock_models = MagicMock()
+        mock_models.data = [
+            MagicMock(id="meta/llama-3.1-8b-instruct"),
+            MagicMock(id="mistralai/mistral-7b-instruct-v0.3"),
+        ]
+
+        mock_verify_response = MagicMock()
+        mock_verify_response.choices = [MagicMock()]
+        mock_verify_response.choices[0].message.content = "ok"
+
+        mock_client = MagicMock()
+        mock_client.models.list = AsyncMock(return_value=mock_models)
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_verify_response)
+        mock_openai_cls.return_value = mock_client
+
+        provider = NvidiaNIMProvider()
+        await provider._ensure_model()
+
+        assert provider.model == "meta/llama-3.1-8b-instruct"
+        assert provider._model_resolved is True
+
 
 class TestHuggingFaceProviderDiscovery:
 

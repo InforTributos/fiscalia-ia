@@ -122,9 +122,28 @@ class NvidiaNIMProvider(LLMProvider):
         return await _fetch_available_models(client)
 
     async def _ensure_model(self):
-        if not self._model_resolved:
+        if self._model_resolved:
+            return
+
+        if settings.llm_tier2_model:
             self.model = await _auto_select_model()
-            self._model_resolved = True
+        else:
+            models = await self.discover_models()
+            if models:
+                for model in models:
+                    client = AsyncOpenAI(
+                        api_key=settings.llm_tier2_api_key,
+                        base_url=settings.llm_tier2_api_base or "https://integrate.api.nvidia.com/v1",
+                    )
+                    if await _verify_model(client, model):
+                        self.model = model
+                        logger.info("NVIDIA: modelo seleccionado por descubrimiento: %s", model)
+                        break
+                else:
+                    logger.warning("NVIDIA: ninguno de los modelos descubiertos funciona")
+                    self.model = models[0]
+
+        self._model_resolved = True
 
     async def chat(self, messages: list[dict], **kwargs) -> LLMResponse:
         await self._ensure_model()
