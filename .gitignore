@@ -49,7 +49,7 @@ reports/
 .docker/
 
 # Engram DB (memoria local del agente, no se comparte)
-#.engram/
+.engram/
 
 # Node.js
 node_modules/
