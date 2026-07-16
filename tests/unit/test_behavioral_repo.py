@@ -10,22 +10,21 @@ async def test_obtener_contribuyente_found(mock_client_class):
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
     mock_client.execute_sql = AsyncMock()
-    mock_client.execute_sql.return_value = [
-        {"nit": "123", "razon_social": "Test SA", "ciiu": "4711", "regimen": "COMUN",
-         "base_gravable": 1000.0, "impuesto": 50.0, "ingresos_exogena": 5000.0},
+    mock_client.execute_sql.side_effect = [
+        [{"nit": "123", "razon_social": "Test SA", "ciiu": "4711", "regimen": "COMUN",
+          "id_sjto_impsto": 456}],
+        [{"base_gravable": 1000.0, "impuesto": 50.0}],
+        [{"ingresos": 5000.0}],
     ]
 
     repo = OracleBehavioralRepository()
     result = await repo.obtener_contribuyente("123", "2024")
 
     assert result is not None
-    assert result["nit"] == "123"
+    assert result["contribuyente_nit"] == "123"
     assert result["razon_social"] == "Test SA"
     assert result["base_gravable"] == 1000.0
-    mock_client.execute_sql.assert_awaited_once_with(
-        mock_client.execute_sql.await_args_list[0][0][0],
-        {"nit": "123", "periodo": "2024"},
-    )
+    assert mock_client.execute_sql.await_count == 3
 
 
 @pytest.mark.asyncio
@@ -44,13 +43,36 @@ async def test_obtener_contribuyente_not_found(mock_client_class):
 
 @pytest.mark.asyncio
 @patch("infrastructure.mcp.behavioral.OracleClient")
+async def test_obtener_contribuyente_output_keys(mock_client_class):
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.execute_sql = AsyncMock()
+    mock_client.execute_sql.side_effect = [
+        [{"nit": "123", "razon_social": "Test SA", "ciiu": "4711", "regimen": "COMUN",
+          "id_sjto_impsto": 456}],
+        [{"base_gravable": 1000.0, "impuesto": 50.0}],
+        [{"ingresos": 5000.0}],
+    ]
+
+    repo = OracleBehavioralRepository()
+    result = await repo.obtener_contribuyente("123", "2024")
+
+    assert "contribuyente_nit" in result
+    assert result["contribuyente_nit"] == "123"
+
+
+@pytest.mark.asyncio
+@patch("infrastructure.mcp.behavioral.OracleClient")
 async def test_obtener_historico_nit_with_data(mock_client_class):
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
     mock_client.execute_sql = AsyncMock()
-    mock_client.execute_sql.return_value = [
-        {"periodo": 2022, "base_gravable": 500.0, "impuesto": 25.0, "ingresos_exogena": 3000.0},
-        {"periodo": 2023, "base_gravable": 800.0, "impuesto": 40.0, "ingresos_exogena": 4500.0},
+    mock_client.execute_sql.side_effect = [
+        [{"nit": "123", "id_sjto_impsto": 456}],
+        [{"periodo": 2022, "base_gravable": 500.0, "impuesto": 25.0},
+         {"periodo": 2023, "base_gravable": 800.0, "impuesto": 40.0}],
+        [{"periodo": 2022, "ingresos": 3000.0},
+         {"periodo": 2023, "ingresos": 4500.0}],
     ]
 
     repo = OracleBehavioralRepository()
@@ -60,6 +82,7 @@ async def test_obtener_historico_nit_with_data(mock_client_class):
     assert result[0]["periodo"] == 2022
     assert result[1]["periodo"] == 2023
     assert result[0]["base_gravable"] == 500.0
+    assert result[0]["ingresos_exogena"] == 3000.0
 
 
 @pytest.mark.asyncio
@@ -82,8 +105,10 @@ async def test_obtener_historico_nit_single_row(mock_client_class):
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
     mock_client.execute_sql = AsyncMock()
-    mock_client.execute_sql.return_value = [
-        {"periodo": 2024, "base_gravable": 100.0, "impuesto": 5.0, "ingresos_exogena": 500.0},
+    mock_client.execute_sql.side_effect = [
+        [{"nit": "123", "id_sjto_impsto": 456}],
+        [{"periodo": 2024, "base_gravable": 100.0, "impuesto": 5.0}],
+        [{"periodo": 2024, "ingresos": 500.0}],
     ]
 
     repo = OracleBehavioralRepository()

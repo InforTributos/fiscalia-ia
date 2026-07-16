@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from config import settings, setup_logging
 from fastapi import FastAPI
+from infrastructure.mcp.oracle_adapter import close_pool as close_oracle_pool
 from infrastructure.persistence.connection import close_pool, get_pool
 from middleware.error_handler import register_error_handlers
 from middleware.logging import LoggingMiddleware
@@ -40,6 +41,7 @@ async def lifespan(application: FastAPI):
 
     yield
     await close_pool()
+    await close_oracle_pool()
 
 
 app = FastAPI(

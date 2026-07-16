@@ -52,8 +52,12 @@ class OracleClient:
             return rows
 
     async def close(self):
-        global _pool
-        if _pool:
-            await _pool.close()
-            _pool = None
-            logger.info("Oracle pool cerrado")
+        pass
+
+
+async def close_pool():
+    global _pool
+    if _pool:
+        await _pool.close()
+        _pool = None
+        logger.info("Oracle pool cerrado")

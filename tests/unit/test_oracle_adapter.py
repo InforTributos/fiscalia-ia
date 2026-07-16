@@ -86,7 +86,7 @@ async def test_close_cierra_pool():
     client._pool = mock_pool
     await client.close()
 
-    mock_pool.close.assert_awaited_once()
+    mock_pool.close.assert_not_awaited()
 
 
 def _set_mock_settings(mock_settings):
