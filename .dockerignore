@@ -56,6 +56,11 @@ monitor_proceso.py
 microservice/auditor.py
 microservice/benchmark.py
 
+# Node.js (not needed at runtime)
+package.json
+package-lock.json
+node_modules/
+
 # Markdown (not needed at runtime)
 AGENTS.md
 README.md
