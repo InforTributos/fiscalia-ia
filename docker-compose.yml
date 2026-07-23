@@ -9,40 +9,18 @@ services:
     env_file:
       - .env
     environment:
-      - POSTGRES_HOST=postgres
+      - POSTGRES_HOST=postgresql-db
       - POSTGRES_PORT=5432
     restart: unless-stopped
     cpus: '1.0'
     mem_limit: 512m
     mem_reservation: 128m
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
-      - appnet
-
-  postgres:
-    image: postgres:16-bookworm
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: fiscalia
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d fiscalia"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - appnet
-
-volumes:
-  pgdata:
-    name: fiscalia_pgdata
+      - db_default
 
 networks:
-  appnet:
-    driver: bridge
+  db_default:
+    external: true
+    # NOTA: esta red debe existir antes del deploy:
+    #   docker network create db_default
+    # PostgreSQL (postgresql-db) debe estar en la misma red
