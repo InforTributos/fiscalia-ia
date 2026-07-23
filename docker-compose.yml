@@ -1,7 +1,7 @@
 services:
   api:
     build: .
-    image: fiscalia-api
+    image: infortributos/fiscalia-api
     network_mode: host
     env_file:
       - .env
