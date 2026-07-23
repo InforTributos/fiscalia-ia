@@ -2,23 +2,10 @@ services:
   api:
     build: .
     image: fiscalia-api
-    ports:
-      - "${API_PORT:-8001}:8000"
+    network_mode: host
     env_file:
       - .env
-    environment:
-      - POSTGRES_HOST=postgresql-db
-      - POSTGRES_PORT=5432
     restart: unless-stopped
     cpus: '1.0'
     mem_limit: 512m
     mem_reservation: 128m
-    networks:
-      - db_default
-
-networks:
-  db_default:
-    external: true
-    # NOTA: esta red debe existir antes del deploy:
-    #   docker network create db_default
-    # PostgreSQL (postgresql-db) debe estar en la misma red
