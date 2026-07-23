@@ -2,10 +2,10 @@ services:
   api:
     build: .
     image: infortributos/fiscalia-api
-    network_mode: host
+    ports:
+      - "${API_PORT:-8000}:8000"
     env_file:
       - .env
+    environment:
+      - POSTGRES_HOST=172.17.0.1
     restart: unless-stopped
-    cpus: '1.0'
-    mem_limit: 512m
-    mem_reservation: 128m
