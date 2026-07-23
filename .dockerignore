@@ -1,0 +1,62 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Testing
+.pytest_cache/
+htmlcov/
+.hypothesis/
+.ruff_cache/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+MEMORY/
+docs/
+scripts/
+reports/
+node_modules/
+*.log
+
+# Engram & AI
+.engram/
+.claude/
+.playwright-mcp/
+
+# Reports & debug
+benchmark_results.csv
+err.txt
+pag_fail.txt
+tb.txt
+monitor_proceso.py
+microservice/auditor.py
+microservice/benchmark.py
+
+# Markdown (not needed at runtime)
+AGENTS.md
+README.md
+CHANGELOG.md
