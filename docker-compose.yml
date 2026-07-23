@@ -22,7 +22,7 @@ services:
       - appnet
 
   postgres:
-    image: postgres:15
+    image: postgres:16-bookworm
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
