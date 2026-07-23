@@ -35,7 +35,7 @@
 | Término | Definición |
 |---|---|
 | **Factory** | Patrón de diseño para crear objetos. En tests, genera datos sintéticos vía factory-boy. |
-| **FastMCP** | Librería Python para implementar clientes MCP (Model Context Protocol). Usada en `infrastructure/mcp/`. |
+| **FastMCP** | Biblioteca Python para implementar clientes MCP. Anteriormente usada en `infrastructure/mcp/`, reemplazada por conexión Oracle directa via oracledb. |
 | **FiscalIAError** | Jerarquía de excepciones del dominio. Cada tipo tiene código HTTP asociado. |
 
 ## H
@@ -64,8 +64,8 @@
 
 | Término | Definición |
 |---|---|
-| **MCP** | Model Context Protocol. Protocolo estándar para comunicación entre agentes y herramientas. |
-| **MCP Client** | Cliente MCP vía stdio implementado en `infrastructure/mcp/oracle_adapter.py`. |
+| **MCP** | Model Context Protocol. Protocolo estándar para comunicación entre agentes y herramientas. *Nota: El nombre MCP se mantiene en archivos y tablas por herencia del diseño original; actualmente la conexión es directa a Oracle Database 19c+.* |
+| **MCP Client** | Cliente de base de datos Oracle en `infrastructure/mcp/oracle_adapter.py`. Originalmente implementaba un cliente MCP via stdio, migrado a conexión Oracle directa via python-oracledb para reducir latencia. |
 
 ## N
 
@@ -98,7 +98,7 @@
 
 | Término | Definición |
 |---|---|
-| **SRF** | Score de Riesgo Fiscal. Indicador 0-100 con 4 componentes: exógena (35%), tarifa CIIU (25%), omisión (20%), RUES (20%). |
+| **SRF** | Score de Riesgo Fiscal. Indicador 0-100 con 4 componentes: exógena (35%), omisión (20%), tarifa CIIU (25%), RUES (20%). |
 
 ## T
 

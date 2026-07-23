@@ -260,3 +260,30 @@ tags: [decisions, architecture]
 
 > [!warning] No es hash — es comparación de texto JSON
 > La comparación real es `criteria::text = $2::text` (`infrastructure/persistence/queries.py:48`), es decir texto JSON serializado, no un hash canónico. Si `json.dumps(criteria)` produce el mismo dict con distinto orden de keys, la comparación de texto podría no detectar que son "los mismos criterios". Riesgo bajo en la práctica porque `criteria` se construye siempre con el mismo orden de keys en `crear_proceso()`, pero es una fragilidad a tener presente si se refactoriza ese diccionario.
+
+---
+
+## 15. R3 — Corrección: VLOR_BSE en vez de VLOR_RTNCION
+
+| Campo | Valor |
+|---|---|
+| **Fecha** | 2026-07-23 |
+| **Estado** | ✅ Implementado |
+| **Archivos** | `infrastructure/mcp/behavioral.py`, `infrastructure/mcp/pagination.py` |
+| **Tests** | `tests/unit/test_exogena_fix.py` (13 tests) |
+
+**Problema detectado:** R3 (brecha exógena) usaba `SUM(vlor_rtncion)` para calcular `ingresos_exogena`. Esto sumaba el valor de la retención (ej: $40k sobre una compra de $8M) y lo comparaba contra la base gravable declarada (ej: $100M). Las magnitudes eran tan distintas que R3 nunca superaba el umbral del 15%, resultando en un falso negativo permanente.
+
+**Solución:** Cambiar a `SUM(vlor_bse)` (la base real de cada operación de retención) y filtrar solo `cdgo_exgna_tpo_rgstro = 'RD'` (retenciones recibidas = le retuvieron al contribuyente), que son las que reflejan el ingreso del contribuyente.
+
+**Bug adicional encontrado:** `pagination.py` usaba `'RECIBIDA'` y `'PRACTICADA'` en los CASE WHEN de `OBTENER_EXOGENA_SQL`, pero los valores reales en Oracle son `'RD'` y `'RP'`. Los CASE nunca matcheaban, y las columnas `retenciones_exogena_recibidas` / `retenciones_exogena_practicadas` siempre devolvían 0.
+
+**Cambios realizados:**
+| Archivo | Query | Cambio |
+|---------|-------|--------|
+| behavioral.py | `EXOGENA_PERIODO_SQL` | `SUM(vlor_rtncion)` → `COALESCE(SUM(vlor_bse), 0)`, + filtro `cdgo_exgna_tpo_rgstro = 'RD'` |
+| behavioral.py | `PARES_METRICAS_SQL` (subquery exo_data) | Ídem |
+| behavioral.py | `HISTORICO_EXOGENA_SQL` | Ídem |
+| pagination.py | `OBTENER_EXOGENA_SQL` | `ingresos` usa `vlor_bse`; CASE `'RECIBIDA'`→`'RD'`, `'PRACTICADA'`→`'RP'` (retenciones Externas conservan `vlor_rtncion`) |
+
+**Cobertura de datos:** `VLOR_BSE` tiene 99.95% de cobertura en registros 2021-2025 (144.195 de 144.267). Solo 66 registros carecen de base y también carecen de tarifa para estimación — ruido despreciable.

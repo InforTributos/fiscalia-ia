@@ -12,28 +12,44 @@
   "vigencia_fin": "2024-12-31",
   "tipo_regimen": "COMUN",
   "actividades_economicas": ["4711", "4712", "4721"],
-  "periodo": "2024"
+  "periodo": "2024",
+  "tipo": "COMPLETO",
+  "max_nits": 0,
+  "umbral_retenciones_pct": 5.0
 }
 ```
+
+| Parámetro | Tipo | Default | Requerido | Descripción |
+|---|---|---|---|---|
+| `entidad_nit` | string | — | Sí | NIT de la entidad fiscalizadora |
+| `nombre` | string | — | Sí | Nombre descriptivo del proceso |
+| `vigencia_ini` | string | — | Sí | Fecha inicial del período (YYYY-MM-DD) |
+| `vigencia_fin` | string | — | Sí | Fecha final del período (YYYY-MM-DD) |
+| `tipo_regimen` | string | — | Sí | COMUN / SIMPLIFICADO |
+| `actividades_economicas` | string[] | — | Sí | Lista de códigos CIIU |
+| `periodo` | string | — | Sí | Año fiscal |
+| `tipo` | string | `BASICO` | No | `BASICO` = SRF+LLM (paralelo), `COMPLETO` = BASICO + comportamiento + reglas + score + resumen |
+| `max_nits` | int | 0 | No | Límite de NITs a procesar (0 = ilimitado) |
+| `umbral_retenciones_pct` | float | 5.0 | No | Umbral porcentual para inexactos retenciones |
 
 **Response (201):**
 
 ```json
 {
-  "proceso_id": "uuid-o-id-12345",
+  "proceso_id": "uuid-del-proceso",
   "intento_id": 1,
-  "estado": "PREFILTRADO_COMPLETADO",
+  "estado": "EN_COLA",
   "nombre": "Proceso Comercio Q1 2024",
   "entidad_nit": "9003189639",
   "resumen": {
-    "total_nits": 8500,
-    "omisos": 1200,
-    "exactos": 6300,
-    "inexactos": 1000
+    "total_nits": 0,
+    "omisos": 0,
+    "exactos": 0,
+    "inexactos": 0
   },
   "proceso_analisis": {
     "estado": "EN_COLA",
-    "mensaje": "Pre-filtrado completado en 18s. Análisis IA en background."
+    "mensaje": "Proceso creado. Iniciando pre-filtrado de candidatos en Oracle."
   },
   "created_at": "2026-06-21T10:30:00Z"
 }
@@ -51,56 +67,17 @@
 | Resultados anteriores | Se preservan (historial de intentos) |
 | Re-solo NITs fallidos | **No soportado en V1** — se re-ejecutan todos |
 
-**Background task mechanism:**
-
-| Aspecto | Decisión |
-|---|---|
-| **Recomendado** | **Procrastinate** — cola de tareas basada en PostgreSQL (sin infra extra) |
-| Alternativa simple | `asyncio.create_task()` — tasks en memoria (se pierden si el contenedor cae) |
-| ~~No usar~~ | ~~Celery/ARQ + Redis~~ — sobre-ingeniería para este caso |
-| Límite concurrencia | Max 5 procesos simultáneos (configurable via `MAX_CONCURRENT_PROCESSES`) |
-| Timeout proceso | 30 min por proceso (configurable via `PROCESS_TIMEOUT_MINUTES`) |
-| Persistencia | Procrastinate almacena tasks en PostgreSQL → sobreviven reinicios |
-| Retry | Automático con backoff (3 intentos) |
-| Cancelación | No expuesta en V1 (futuro: `DELETE /proceso/{id}`) |
+**Cancelación:** Endpoint `POST /proceso/{proceso_id}/cancelar` disponible. Marca el proceso como `INTERRUMPIDO` y cancela la tarea activa via `asyncio.CancelledError`.
 
 **Flujo interno:**
 
-```mermaid
-sequenceDiagram
-    participant APEX
-    participant API as FastAPI
-    participant MCP as MCP Server
-    participant PG as PostgreSQL
-    participant LLM as LLM Service
+1. `POST /proceso` recibe el request, valida que la entidad exista en PostgreSQL, verifica duplicados activos (mismos criteria), crea el proceso + intento en PostgreSQL, actualiza estado a `EN_COLA`, dispara `asyncio.create_task()` en background, retorna **201** inmediato con `ProcesoResumen()` vacío (todo en cero).
 
-    APEX->>API: POST /proceso (criterios + entidad_nit)
-    API->>PG: INSERT proceso (estado: PENDIENTE)
-    API->>PG: INSERT proceso_intentos (intento: 1, estado: EN_PROCESO)
-    API->>MCP: call_tool(buscar_contribuyentes, criterios)
-    loop Paginación MCP
-        MCP-->>API: página de NITs
-        API->>PG: INSERT proceso_detalle
-    end
-    API->>API: Clasificar: omisos / exactos / inexactos
-    API->>PG: UPDATE proceso_detalle (clasificacion)
-    API->>PG: UPDATE proceso_intentos (estado: PREFILTRADO_COMPLETADO)
-    API-->>APEX: 201 + resumen
-    Note over API,LLM: Background task
-    API->>MCP: call_tool(obtener_datos_fiscales, nit)
-    MCP-->>API: datos fiscales
-    API->>LLM: analizar(datos + contexto)
-    LLM->>LLM: Tier 1 → Tier 2 → Tier 3 (fallback)
-    LLM-->>API: hallazgos + explicación
-    API->>PG: UPDATE proceso_detalle (hallazgos + srf)
-    API->>PG: UPDATE proceso_intentos (procesados +1)
-    opt Error en algún NIT
-        API->>PG: INSERT proceso_detalle_errores
-        API->>PG: INSERT proceso_errores (si es error de proceso)
-    end
-    API->>PG: UPDATE proceso_intentos (estado: COMPLETADO, completed_at)
-    API->>PG: UPDATE procesos (intentos_total: 1)
-```
+2. **Background task** (`_lanzar_analisis` → `analizar_proceso`):
+   - Espera turno en semáforo de concurrencia (max 5 procesos simultáneos)
+   - **Pre-filtro Oracle**: ejecuta 4 queries de descubrimiento (omisos conocidos, omisos desconocidos, inexactos CIIU, inexactos retenciones) → clasifica contribuyentes como `OMISO` o `INEXACTO`
+   - **Análisis IA por NIT**: para cada NIT ejecuta SRF (cálculo local) + LLM (cadena de 3 tiers con fallback)
+   - **Si es COMPLETO**: además corre análisis comportamental (grupo par), reglas fiscales, genera score unificado y expediente fiscal
 
 ---
 
@@ -110,7 +87,7 @@ sequenceDiagram
 
 ```json
 {
-  "proceso_id": "uuid-o-id-12345",
+  "proceso_id": "uuid-del-proceso",
   "estado": "EN_PROCESO",
   "entidad_nit": "9003189639",
   "intento_actual": {
@@ -130,8 +107,8 @@ sequenceDiagram
     "faltantes": 1205
   },
   "clasificacion": {
-    "omisos": { "total": 1200, "procesados": 600 },
-    "inexactos": { "total": 1000, "procesados": 395 }
+    "omisos": { "total": 1200, "procesados": 0 },
+    "inexactos": { "total": 1000, "procesados": 0 }
   },
   "started_at": "2026-06-21T10:30:05Z",
   "ultimo_update": "2026-06-21T10:35:12Z"
@@ -153,20 +130,8 @@ sequenceDiagram
 
 **Máquina de estados:**
 
-```mermaid
-stateDiagram-v2
-    [*] --> PENDIENTE: POST /proceso
-    PENDIENTE --> PREFILTRANDO: Inicia MCP
-    PREFILTRANDO --> PREFILTRADO_COMPLETADO: MCP completa
-    PREFILTRANDO --> ERROR: MCP falla
-    PREFILTRADO_COMPLETADO --> EN_COLA: Background task encolada
-    EN_COLA --> EN_PROCESO: Worker disponible
-    EN_PROCESO --> COMPLETADO: Todos los NITs OK
-    EN_PROCESO --> ERROR: Timeout / Error fatal
-    EN_PROCESO --> INTERRUMPIDO: Contenedor cae
-    INTERRUMPIDO --> EN_COLA: Restart manual (re-lanzamiento)
-    ERROR --> [*]
-    COMPLETADO --> [*]
+```
+PENDIENTE → PREFILTRANDO → PREFILTRADO_COMPLETADO → EN_COLA → EN_PROCESO → COMPLETADO | ERROR
 ```
 
 ---
@@ -190,9 +155,10 @@ stateDiagram-v2
 
 ```json
 {
-  "proceso_id": "uuid-o-id-12345",
+  "proceso_id": "uuid-del-proceso",
   "estado": "COMPLETADO",
   "intento_id": 2,
+  "parcial": false,
   "paginacion": {
     "page": 1,
     "page_size": 50,
@@ -212,11 +178,9 @@ stateDiagram-v2
       "hallazgos": [
         {
           "tipo": "SUBDECLARACION_EXOGENA",
-          "declarado_ica": 50000000,
-          "exogena": 120000000,
-          "diferencia": 70000000,
-          "variacion_pct": 140,
-          "explicacion_ia": "El contribuyente declaró $50M en ICA..."
+          "severidad": "ALTA",
+          "explicacion_ia": "El contribuyente declaró $50M en ICA...",
+          "detalle": {}
         }
       ],
       "explicacion_ia": "Contribuyente con alto riesgo de subdeclaración..."
@@ -229,7 +193,7 @@ stateDiagram-v2
 
 ```json
 {
-  "proceso_id": "uuid-o-id-12345",
+  "proceso_id": "uuid-del-proceso",
   "estado": "EN_PROCESO",
   "intento_id": 2,
   "parcial": true,
@@ -239,7 +203,7 @@ stateDiagram-v2
     "total_registros": 995,
     "total_paginas": 20
   },
-  "resultados": [...]
+  "resultados": []
 }
 ```
 
@@ -248,7 +212,7 @@ stateDiagram-v2
 ```json
 {
   "error": "PROCESO_EN_PROCESO",
-  "mensaje": "El proceso aún no ha terminado. Use include_partial=true para ver resultados parciales.",
+  "mensaje": "El proceso aún no ha terminado (estado: EN_PROCESO). Use include_partial=true para ver resultados parciales.",
   "estado": "EN_PROCESO",
   "progreso": {
     "porcentaje": 45.2,
@@ -256,28 +220,6 @@ stateDiagram-v2
     "faltantes": 1205
   }
 }
-```
-
-**Flujo del endpoint:**
-
-```mermaid
-flowchart TD
-    A[GET /proceso/id/results] --> B{intento_id?}
-    B -->|null| C[Usar último intento]
-    B -->|num| D[Usar intento especificado]
-    C --> E{include_partial?}
-    D --> E
-    E -->|false| F{Proceso terminado?}
-    F -->|COMPLETADO| G[SELECT proceso_detalle paginado]
-    F -->|EN_PROCESO / EN_COLA| H[409 — PROCESO_EN_PROCESO]
-    E -->|true| G
-    G --> G1{Filtros?}
-    G1 -->|clasificacion| I[WHERE clasificacion = x]
-    G1 -->|min_score| J[WHERE mcp_score >= x]
-    G1 -->|sin filtros| K[ORDER BY + LIMIT/OFFSET]
-    I --> K
-    J --> K
-    K --> L[Retornar resultados + paginación]
 ```
 
 ---
@@ -296,7 +238,7 @@ flowchart TD
 
 ```json
 {
-  "proceso_id": "uuid-o-id-12345",
+  "proceso_id": "uuid-del-proceso",
   "errores_proceso": [
     {
       "id": 1,
@@ -325,23 +267,16 @@ flowchart TD
 
 ---
 
-## 5. POST /analizar/{nit} — Análisis individual
+## 5. POST /analizar/{contribuyente_nit} — Análisis individual
 
-**Request:**
+**Endpoint:** `POST /api/v1/analizar/{contribuyente_nit}?periodo=2024`
 
-```json
-{
-  "entidad_nit": "9003189639",
-  "nit_objetivo": "9012345678",
-  "periodo": "2024"
-}
-```
+| Parámetro | Tipo | Default | Requerido | Descripción |
+|---|---|---|---|---|
+| `contribuyente_nit` | string | — | Sí (path) | NIT del contribuyente a analizar |
+| `periodo` | string | `2024` | No (query) | Año fiscal a analizar |
 
-| Parámetro | Tipo | Requerido | Descripción |
-|---|---|---|---|
-| `nit_objetivo` | string | Sí | NIT del contribuyente a analizar (path param) |
-| `entidad_nit` | string | Sí | NIT de la entidad fiscalizadora |
-| `periodo` | string | No | Año fiscal a analizar (default: año actual) |
+**Sin body** — el NIT va como path param y el período como query param.
 
 **Response (200):**
 
@@ -352,8 +287,13 @@ flowchart TD
   "ciiu": "4711",
   "clasificacion": "INEXACTO",
   "mcp_score": 85.5,
-  "mcp_razon": "Diferencia de ingresos del 45%",
+  "mcp_razon": "",
   "srf_total": 78,
+  "componentes_srf": [
+    { "nombre": "consistencia", "valor": 80, "peso": 0.3 },
+    { "nombre": "historial", "valor": 75, "peso": 0.4 },
+    { "nombre": "declaracion", "valor": 82, "peso": 0.3 }
+  ],
   "nivel_riesgo": "ALTO",
   "hallazgos": [
     {
@@ -368,7 +308,8 @@ flowchart TD
   "explicacion_ia": "Contribuyente con alto riesgo de subdeclaración...",
   "tokens_utilizados": 2500,
   "duracion_ms": 45000,
-  "provider_utilizado": "anthropic"
+  "provider_utilizado": "anthropic",
+  "cache_hit": false
 }
 ```
 
@@ -403,7 +344,433 @@ flowchart TD
 
 ---
 
-## 18. Seguridad y Operaciones
+## 6. GET /contribuyente/{nit}/comportamiento — Análisis comportamental
+
+**Endpoint:** `GET /api/v1/contribuyente/{contribuyente_nit}/comportamiento?periodo=2024&ciiu=&regimen=&min_pares=10`
+
+| Parámetro | Tipo | Default | Descripción |
+|---|---|---|---|
+| `contribuyente_nit` | string | — | NIT del contribuyente (path) |
+| `periodo` | string | `2024` | Año fiscal (query) |
+| `ciiu` | string | null | Código CIIU para filtrar grupo par |
+| `regimen` | string | null | Régimen para filtrar grupo par |
+| `min_pares` | int | 10 | Mínimo de pares para calcular benchmark (3-100) |
+
+**Response (200):** Compara al contribuyente contra su grupo par (mismo CIIU + régimen).
+
+```json
+{
+  "contribuyente_nit": "9012345678",
+  "periodo": "2024",
+  "score_comportamental": 72.4,
+  "prioridad": "ALTA",
+  "confianza": 0.85,
+  "metricas": {
+    "declaracion_oportuna": true,
+    "variacion_ingresos_pct": -12.5,
+    "retenciones_pct": 3.2,
+    "antiguedad_dias": 45
+  },
+  "benchmark": {
+    "tamano_grupo": 150,
+    "media_score": 65.0,
+    "desviacion_std": 15.3,
+    "percentil_contribuyente": 75
+  },
+  "desviaciones": [
+    {
+      "metrica": "variacion_ingresos_pct",
+      "valor_contribuyente": -12.5,
+      "media_grupo": 2.1,
+      "desviacion_std": 5.0,
+      "z_score": -2.92,
+      "significativa": true
+    }
+  ],
+  "hallazgos": [
+    "La variación de ingresos del contribuyente está 2.92 desviaciones por debajo de la media del grupo par"
+  ],
+  "explicacion": "El contribuyente presenta un score comportamental de 72.4, ubicándose en el percentil 75 de su grupo par..."
+}
+```
+
+---
+
+## 7. GET /proceso/{id}/ranking-comportamental — Ranking comportamental del proceso
+
+**Endpoint:** `GET /api/v1/proceso/{proceso_id}/ranking-comportamental?periodo=&limite=50&min_score=0&min_pares=10`
+
+| Parámetro | Tipo | Default | Descripción |
+|---|---|---|---|
+| `proceso_id` | UUID | — | ID del proceso (path) |
+| `periodo` | string | null | Año fiscal (query, opcional) |
+| `limite` | int | 50 | Máximo de resultados (1-100) |
+| `min_score` | float | 0 | Score mínimo para incluir (0-100) |
+| `min_pares` | int | 10 | Mínimo de pares para incluir (3-100) |
+
+**Response (200):**
+
+```json
+{
+  "proceso_id": "uuid-del-proceso",
+  "periodo": "2024",
+  "total": 45,
+  "ranking": [
+    {
+      "contribuyente_nit": "9012345678",
+      "razon_social": "COMERCIO XYZ S.A.S.",
+      "score_comportamental": 85.3,
+      "prioridad": "ALTA",
+      "confianza": 0.92,
+      "num_pares": 120,
+      "desviaciones_significativas": 3
+    }
+  ]
+}
+```
+
+---
+
+## 8. GET /contribuyente/{nit}/grafo-riesgo — Grafo de riesgo (conexiones empresariales)
+
+**Endpoint:** `GET /api/v1/contribuyente/{contribuyente_nit}/grafo-riesgo?periodo=2024&min_pares=10&incluir_comportamiento=true`
+
+| Parámetro | Tipo | Default | Descripción |
+|---|---|---|---|
+| `contribuyente_nit` | string | — | NIT del contribuyente (path) |
+| `periodo` | string | `2024` | Año fiscal (query) |
+| `min_pares` | int | 10 | Mínimo de pares (3-100) |
+| `incluir_comportamiento` | bool | `true` | Incluir análisis comportamental |
+
+**Response (200):** Analiza conexiones empresariales (dirección, teléfono, correo, representante legal).
+
+```json
+{
+  "nit_central": "9012345678",
+  "periodo": "2024",
+  "nodes": [
+    { "id": "9012345678", "label": "COMERCIO XYZ S.A.S.", "tipo": "central", "score": 72.4 },
+    { "id": "9012345679", "label": "INVERSIONES ABC LTDA", "tipo": "relacionado", "score": 45.0 },
+    { "id": "9003189639", "label": "MUNICIPIO VALLEDUPAR", "tipo": "entidad", "score": null }
+  ],
+  "edges": [
+    { "source": "9012345678", "target": "9012345679", "relacion": "COMPARTE_DIRECCION", "peso": 0.9 },
+    { "source": "9012345678", "target": "9003189639", "relacion": "FISCALIZA", "peso": 1.0 }
+  ],
+  "resumen_red": {
+    "total_nodos": 3,
+    "total_conexiones": 2,
+    "densidad_red": 0.33,
+    "componentes_conexos": 1
+  },
+  "analisis_comportamental": {
+    "score_comportamental": 72.4,
+    "prioridad": "ALTA",
+    "confianza": 0.85
+  }
+}
+```
+
+---
+
+## 9. GET /contribuyente/{nit}/expediente-fiscal — Expediente fiscal unificado
+
+**Endpoint:** `GET /api/v1/contribuyente/{contribuyente_nit}/expediente-fiscal?periodo=2024&min_pares=10`
+
+| Parámetro | Tipo | Default | Descripción |
+|---|---|---|---|
+| `contribuyente_nit` | string | — | NIT del contribuyente (path) |
+| `periodo` | string | `2024` | Año fiscal (query) |
+| `min_pares` | int | 10 | Mínimo de pares (3-100) |
+
+**Response (200):**
+
+```json
+{
+  "contribuyente_nit": "9012345678",
+  "razon_social": "COMERCIO XYZ S.A.S.",
+  "periodo": "2024",
+  "score_fiscal_unificado": 78.5,
+  "resumen_ejecutivo": "Contribuyente con riesgo ALTO. Presenta inconsistencias en ingresos reportados vs exógena...",
+  "acciones_sugeridas": [
+    "Requerir declaración corregida del período 2024",
+    "Iniciar proceso de fiscalización electrónica",
+    "Verificar retenciones practicadas"
+  ],
+  "markdown": "# Expediente Fiscal: COMERCIO XYZ S.A.S.\n\n## Resumen\n..."
+}
+```
+
+---
+
+## 10. POST /fiscalizacion/reglas/evaluar — Evaluar reglas fiscales
+
+**Endpoint:** `POST /api/v1/fiscalizacion/reglas/evaluar`
+
+**Body:** `PerfilFiscalRequest` (declaraciones, retenciones, exógena, facturación, contratos).
+
+```json
+{
+  "contribuyente_nit": "9012345678",
+  "periodo": "2024",
+  "declaraciones": { "total_ingresos": 50000000, "impuesto_declarado": 1500000 },
+  "retenciones": { "practicadas": 500000, "declaradas": 300000 },
+  "exogena": { "ingresos_reportados": 120000000 },
+  "facturacion": { "total_facturado": 130000000 },
+  "contratos": { "total_contratos": 80000000 },
+  "reglas": ["REGLA_001", "REGLA_002"]
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "total": 2,
+  "resultados": [
+    {
+      "codigo": "REGLA_001",
+      "nombre": "Subdeclaración vs Exógena",
+      "cumple": false,
+      "severidad": "ALTA",
+      "detalle": "Diferencia del 140% entre ingresos declarados y exógena",
+      "valor_detectado": 70000000,
+      "umbral": 5000000
+    }
+  ]
+}
+```
+
+---
+
+## 11. POST /fiscalizacion/reglas/evaluar/{nit} — Evaluar reglas por NIT (desde Oracle)
+
+**Endpoint:** `POST /api/v1/fiscalizacion/reglas/evaluar/{contribuyente_nit}?periodo=2024&reglas=REGLA_001&reglas=REGLA_002`
+
+Obtiene datos desde Oracle y evalúa reglas.
+
+| Parámetro | Tipo | Default | Descripción |
+|---|---|---|---|
+| `contribuyente_nit` | string | — | NIT del contribuyente (path) |
+| `periodo` | string | `2024` | Año fiscal (query) |
+| `reglas` | string[] | null | Lista opcional de reglas a evaluar |
+
+**Response (200):** Mismo formato que §10.
+
+---
+
+## 12. POST /fiscalizacion/reglas/ejecutar — Ejecutar reglas (persiste hallazgos)
+
+**Endpoint:** `POST /api/v1/fiscalizacion/reglas/ejecutar`
+
+Similar a evaluar (`PerfilFiscalRequest`) pero persiste los hallazgos en BD. Acepta `proceso_id` y `entidad_id` opcionales.
+
+**Response (201):**
+
+```json
+[
+  {
+    "id": "uuid-del-hallazgo",
+    "contribuyente_nit": "9012345678",
+    "regla": "REGLA_001",
+    "tipo": "INCONSISTENCIA",
+    "severidad": "ALTA",
+    "descripcion": "Subdeclaración detectada vs exógena",
+    "estado": "PENDIENTE",
+    "accionable": true,
+    "created_at": "2026-06-21T10:30:00Z"
+  }
+]
+```
+
+También existe `POST /fiscalizacion/reglas/ejecutar/{contribuyente_nit}` que obtiene datos desde Oracle y ejecuta.
+
+---
+
+## 13. POST /fiscalizacion/hallazgos — Crear hallazgo manual
+
+**Endpoint:** `POST /api/v1/fiscalizacion/hallazgos`
+
+```json
+{
+  "contribuyente_nit": "9012345678",
+  "regla": "REGLA_MANUAL",
+  "tipo": "OBSERVACION",
+  "severidad": "MEDIA",
+  "descripcion": "Hallazgo creado manualmente por funcionario",
+  "proceso_id": null,
+  "entidad_id": null
+}
+```
+
+**Response (201):** Hallazgo creado con `id`, `estado: "PENDIENTE"`, `created_at`.
+
+---
+
+## 14. GET /fiscalizacion/hallazgos — Listar hallazgos
+
+**Endpoint:** `GET /api/v1/fiscalizacion/hallazgos?estado=&regla=&contribuyente_nit=&accionable=&page=1&page_size=50`
+
+| Parámetro | Tipo | Default | Descripción |
+|---|---|---|---|
+| `estado` | string | null | Filtrar por estado |
+| `regla` | string | null | Filtrar por código de regla |
+| `contribuyente_nit` | string | null | Filtrar por NIT |
+| `accionable` | bool | null | Filtrar solo accionables |
+| `page` | int | 1 | Número de página |
+| `page_size` | int | 50 | Registros por página (max 200) |
+
+**Response (200):**
+
+```json
+{
+  "total": 150,
+  "page": 1,
+  "page_size": 50,
+  "resultados": [
+    {
+      "id": "uuid",
+      "contribuyente_nit": "9012345678",
+      "regla": "REGLA_001",
+      "tipo": "INCONSISTENCIA",
+      "severidad": "ALTA",
+      "descripcion": "...",
+      "estado": "PENDIENTE",
+      "accionable": true,
+      "created_at": "2026-06-21T10:30:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 15. GET /fiscalizacion/hallazgos/{id} — Detalle de hallazgo
+
+**Endpoint:** `GET /api/v1/fiscalizacion/hallazgos/{hallazgo_id}`
+
+**Response (200):** Mismo formato individual que el `HallazgoResponse` de §12.
+
+---
+
+## 16. POST /fiscalizacion/hallazgos/{id}/revision — Revisión humana
+
+**Endpoint:** `POST /api/v1/fiscalizacion/hallazgos/{hallazgo_id}/revision`
+
+```json
+{
+  "funcionario_id": "uuid-del-funcionario",
+  "decision": "ACEPTADO",
+  "motivo": "Hallazgo válido, se procede con requerimiento"
+}
+```
+
+`decision` puede ser: `ACEPTADO`, `RECHAZADO`, `EN_REVISION`.
+
+**Response (200):** Hallazgo actualizado con `estado`, `revisado_por`, `revisado_en`.
+
+---
+
+## 17. POST /fiscalizacion/hallazgos/{id}/revision-agente — Revisión asistida por IA
+
+**Endpoint:** `POST /api/v1/fiscalizacion/hallazgos/{hallazgo_id}/revision-agente`
+
+```json
+{
+  "usar_ia": true
+}
+```
+
+**Response (200):** Incluye análisis del agente IA y recomendación.
+
+```json
+{
+  "hallazgo_id": "uuid",
+  "analisis_agente": "El hallazgo es consistente con los datos fiscales...",
+  "recomendacion": "ACEPTADO",
+  "confianza": 0.88,
+  "revisado_en": "2026-06-21T11:00:00Z"
+}
+```
+
+---
+
+## 18. POST /entidad_fiscalizadora — Crear entidad fiscalizadora
+
+**Endpoint:** `POST /api/v1/entidad_fiscalizadora`
+
+```json
+{
+  "entidad_nit": "9003189639",
+  "nombre": "Municipio de Valledupar",
+  "email": "fiscalia@valledupar.gov.co"
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "uuid",
+  "entidad_nit": "9003189639",
+  "nombre": "Municipio de Valledupar",
+  "email": "fiscalia@valledupar.gov.co",
+  "activo": true
+}
+```
+
+---
+
+## 19. GET /entidad_fiscalizadora/{nit} — Obtener entidad por NIT
+
+**Endpoint:** `GET /api/v1/entidad_fiscalizadora/{entidad_nit}`
+
+**Response (200):** Mismo formato que `EntidadResponse`.
+
+**Response (404):** `EntidadNoEncontradoError`.
+
+---
+
+## 20. GET /entidades_fiscalizadoras — Listar entidades
+
+**Endpoint:** `GET /api/v1/entidades_fiscalizadoras?page=1&page_size=20`
+
+**Response (200):**
+
+```json
+{
+  "page": 1,
+  "page_size": 20,
+  "mensaje": "Listado no implementado"
+}
+```
+
+---
+
+## 21. GET /proceso/{id}/export — Exportar resultados a Excel
+
+**Endpoint:** `GET /api/v1/proceso/{proceso_id}/export?formato=xlsx`
+
+| Parámetro | Tipo | Default | Descripción |
+|---|---|---|---|
+| `proceso_id` | UUID | — | ID del proceso (path) |
+| `formato` | string | `xlsx` | Formato de exportación (solo xlsx) |
+
+**Response (200):** `StreamingResponse` con `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` y archivo `.xlsx` con dos hojas:
+- **Resumen**: datos agregados del proceso
+- **Resultados Campaña**: detalle por NIT con columnas NIT, Razón Social, CIIU, Clasificación, Score Unificado, SRF, Nivel Riesgo, Hallazgos, Explicación IA
+
+---
+
+## 22. GET /visor/grafo/{nit} — Visor HTML interactivo del grafo de riesgo
+
+**Endpoint:** `GET /api/v1/visor/grafo/{contribuyente_nit}?periodo=2024`
+
+Retorna una página HTML interactiva con el grafo de riesgo del contribuyente (rendereado con librería gráfica en el frontend).
+
+---
+
+## 23. Seguridad y Operaciones
 
 > **Modelo de seguridad:** Solo red privada OCI. Sin autenticación por API key — APEX es el único consumidor y accede vía red interna.
 

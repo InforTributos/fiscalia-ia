@@ -189,6 +189,30 @@ El conocimiento del dominio ICA (SRF, agentes AGT-00 a AGT-05, CIIU) está en `.
 
 HF usa política `:fastest` — selecciona automáticamente el provider más rápido entre SambaNova, Together AI, Fireworks AI, Nebius, Novita. El mismo modelo Qwen2.5-7B corre en múltiples providers.
 
+## R3: VLOR_BSE vs VLOR_RTNCION
+
+Hasta jul/2026 R3 usaba `SUM(vlor_rtncion)` para calcular `ingresos_exogena`. Esto sumaba el **valor de la retención** (ej: $40k), no la **base de la operación** (ej: $8M). Al comparar $40k contra $100M de base declarada, R3 nunca superaba el umbral del 15% y nunca se disparaba.
+
+**Fix:** Cambiar a `SUM(vlor_bse)` — la base real de la operación de retención. Eso sí es comparable con `BSE_GRVBLE`.
+
+## pagination.py: CASE codes equivocados
+
+`OBTENER_EXOGENA_SQL` en `pagination.py` usaba `'RECIBIDA'` y `'PRACTICADA'` en los CASE WHEN, pero los valores reales en Oracle son `'RD'` (retención recibida) y `'RP'` (retención practicada). Los CASE nunca matcheaban y las columnas `retenciones_exogena_recibidas` / `retenciones_exogena_practicadas` siempre devolvían 0.
+
+**Fix:** Cambiar a `'RD'` y `'RP'`.
+
+## R3 solo usa RD, no RP
+
+De los dos tipos de retención en `GI_G_EXOGENA_RETENCIONES`:
+- **RD** (4% registros) = le retuvieron al contribuyente → refleja SUS ingresos ✅ para R3
+- **RP** (96% registros) = él retuvo a otros → refleja ingresos de SUS CLIENTES ❌ no sirve para R3
+
+R3 ahora filtra `cdgo_exgna_tpo_rgstro = 'RD'`. Si el contribuyente no tiene registros RD, R3 simplemente no aplica (no hay falso positivo).
+
+## `GI_G_EXOGENA_RETENCIONES` es municipal, no DIAN
+
+A pesar de que el código interno usa el nombre `exogena_dian`, esta tabla almacena **retenciones municipales de ICA**, no exógena de la DIAN (que es de Renta/IVA). El ICA es un impuesto municipal y sus retenciones son municipales.
+
 ## Planes v1 y v2.1 son idénticos
 
 Ambos archivos en `../Planes de trabajo/fiscalIA/` son copia exacta. El plan v2.1 está en `.opencode/plans/` para referencia del agente, sin cambios sobre v1. No hay diferencias que trackear.

@@ -4,7 +4,13 @@ from infrastructure.mcp.oracle_adapter import OracleClient
 
 CONTRIBUYENTE_LOOKUP_SQL = """
 SELECT s.idntfccion AS nit, p.nmbre_rzon_scial AS razon_social,
-       p.id_actvdad_ecnmca AS ciiu, se.cdgo_sjto_estdo AS regimen,
+       p.id_actvdad_ecnmca AS ciiu,
+       CASE se.cdgo_sjto_estdo
+           WHEN 'A' THEN 'ACTIVO'
+           WHEN 'I' THEN 'INACTIVO'
+           WHEN 'O' THEN 'OMISO_DESCONOCIDO'
+           ELSE ''
+       END AS rues_estado,
        si.id_sjto_impsto
 FROM GENESYS.SI_C_SUJETOS s
 JOIN GENESYS.SI_I_SUJETOS_IMPUESTO si ON s.id_sjto = si.id_sjto
@@ -29,9 +35,10 @@ WHERE d.id_sjto_impsto = :id_sjto_impsto
 """
 
 EXOGENA_PERIODO_SQL = """
-SELECT vgncia_rtncion AS periodo, SUM(vlor_rtncion) AS ingresos
+SELECT vgncia_rtncion AS periodo, COALESCE(SUM(vlor_bse), 0) AS ingresos
 FROM GENESYS.GI_G_EXOGENA_RETENCIONES
 WHERE idntfccion = :nit AND vgncia_rtncion = :periodo
+  AND cdgo_exgna_tpo_rgstro = 'RD'
 GROUP BY vgncia_rtncion
 """
 
@@ -60,9 +67,10 @@ LEFT JOIN (
     GROUP BY d.id_sjto_impsto
 ) dec_data ON si.id_sjto_impsto = dec_data.id_sjto_impsto
 LEFT JOIN (
-    SELECT idntfccion, SUM(vlor_rtncion) AS ingresos_exogena
+    SELECT idntfccion, COALESCE(SUM(vlor_bse), 0) AS ingresos_exogena
     FROM GENESYS.GI_G_EXOGENA_RETENCIONES
     WHERE vgncia_rtncion = :periodo
+      AND cdgo_exgna_tpo_rgstro = 'RD'
     GROUP BY idntfccion
 ) exo_data ON s.idntfccion = exo_data.idntfccion
 WHERE i.cdgo_impsto = 'ICA'
@@ -88,9 +96,10 @@ ORDER BY d.vgncia
 """
 
 HISTORICO_EXOGENA_SQL = """
-SELECT vgncia_rtncion AS periodo, SUM(vlor_rtncion) AS ingresos
+SELECT vgncia_rtncion AS periodo, COALESCE(SUM(vlor_bse), 0) AS ingresos
 FROM GENESYS.GI_G_EXOGENA_RETENCIONES
 WHERE idntfccion = :nit
+  AND cdgo_exgna_tpo_rgstro = 'RD'
 GROUP BY vgncia_rtncion
 ORDER BY vgncia_rtncion
 """

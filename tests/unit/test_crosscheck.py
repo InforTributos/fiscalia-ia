@@ -140,3 +140,72 @@ def test_inexacto_retenciones_genera_inconsistencia():
     ret_incs = [i for i in incs if i["tipo"] == "RETENCIONES_INCONSISTENTES"]
     assert len(ret_incs) == 1
     assert ret_incs[0]["diferencia_pct"] == 25.0
+
+
+def test_ciiu_sin_tipo_basico():
+    """CIIU check runs WITHOUT tipo field (simula modo BASICO)."""
+    datos = {
+        "nit": "9003189639",
+        "ciiu_declarado": "4711",
+        "ciiu_dian": "4721",
+        "tarifa_declarada": 0.008,
+        "tarifa_dian": 0.010,
+        "declaraciones_ica": [{"periodo": "2024-B1", "base_gravable": 1000000, "tarifa": 0.008, "impuesto": 8000}],
+        "exogena_dian": [],
+    }
+    incs = extraer_inconsistencias(datos)
+    ciiu_incs = [i for i in incs if i["tipo"] == "TARIFA_INCORRECTA_CIIU"]
+    assert len(ciiu_incs) == 1
+    assert ciiu_incs[0]["ciiu_declarado"] == "4711"
+    assert ciiu_incs[0]["ciiu_dian"] == "4721"
+    assert ciiu_incs[0]["severidad"] == "ALTA"
+
+
+def test_retenciones_sin_tipo_basico():
+    """Retenciones check runs WITHOUT tipo field (simula modo BASICO)."""
+    datos = {
+        "nit": "9003189639",
+        "diferencia_pct": 25.0,
+        "retenciones_declaradas_practicadas": 500000,
+        "retenciones_exogena_practicadas": 750000,
+        "declaraciones_ica": [{"periodo": "2024-B1", "base_gravable": 1000000, "tarifa": 0.008, "impuesto": 8000}],
+        "exogena_dian": [],
+    }
+    incs = extraer_inconsistencias(datos)
+    ret_incs = [i for i in incs if i["tipo"] == "RETENCIONES_INCONSISTENTES"]
+    assert len(ret_incs) == 1
+    assert ret_incs[0]["diferencia_pct"] == 25.0
+    assert ret_incs[0]["retenciones_declaradas_practicadas"] == 500000
+    assert ret_incs[0]["retenciones_exogena_practicadas"] == 750000
+    assert ret_incs[0]["severidad"] == "ALTA"
+
+
+def test_ciiu_sin_diferencia_tarifa_no_genera_inconsistencia():
+    """CIIU mismatch but tarifa_dian <= tarifa_declarada: no inconsistency."""
+    datos = {
+        "nit": "9003189639",
+        "ciiu_declarado": "4711",
+        "ciiu_dian": "4721",
+        "tarifa_declarada": 0.010,
+        "tarifa_dian": 0.008,
+        "declaraciones_ica": [{"periodo": "2024-B1", "base_gravable": 1000000, "tarifa": 0.008, "impuesto": 8000}],
+        "exogena_dian": [],
+    }
+    incs = extraer_inconsistencias(datos)
+    ciiu_incs = [i for i in incs if i["tipo"] == "TARIFA_INCORRECTA_CIIU"]
+    assert len(ciiu_incs) == 0
+
+
+def test_retenciones_sin_diferencia_no_genera_inconsistencia():
+    """Retenciones data present but diff_pct is 0: no inconsistency."""
+    datos = {
+        "nit": "9003189639",
+        "diferencia_pct": 0,
+        "retenciones_declaradas_practicadas": 500000,
+        "retenciones_exogena_practicadas": 500000,
+        "declaraciones_ica": [{"periodo": "2024-B1", "base_gravable": 1000000, "tarifa": 0.008, "impuesto": 8000}],
+        "exogena_dian": [],
+    }
+    incs = extraer_inconsistencias(datos)
+    ret_incs = [i for i in incs if i["tipo"] == "RETENCIONES_INCONSISTENTES"]
+    assert len(ret_incs) == 0

@@ -11,11 +11,11 @@
 | Métrica | Valor |
 |---|---|
 | Fases completadas | F-01 a F-07 ✅ |
-| Tests unitarios | 116 (todos pasando) |
+| Tests unitarios | 464 (todos pasando) |
 | Cobertura | 72% (cap: ~72% sin DB/MCP/LLM reales) |
 | Ruff linting | 0 errores (config 120 chars) |
 | Pool PostgreSQL | asyncpg — min=4, max=20, timeout=5 (configurable) |
-| Pendiente externo | MCP Oracle real + conexión (equipo APEX) |
+| Pendiente externo | Datos Oracle reales productivos (equipo APEX/Infra) |
 
 ---
 
@@ -131,6 +131,44 @@
 
 ---
 
+## F-08: Análisis Comportamental y Reglas Fiscales (posterior)
+
+**Objetivo:** Motor de reglas R01-R10, score comportamental vs grupo par, score unificado, grafo de riesgo.
+
+> **⚠️ Nota de implementación:** El motor de reglas (R1-R10) está completamente escrito en `rule_engine.py`, pero no todas las reglas reciben los datos que necesitan. Ver `docs/08-casuistica-fiscal.md#61-estado-de-implementación` para el detalle de cada regla.
+
+| # | Tarea | Archivos | Estado |
+|---|---|---|---|
+| 8.1 | Motor de reglas fiscales R01-R10 | `domain/fiscalizacion/rule_engine.py` | ✅ Código escrito — 7/10 reglas reciben datos |
+| 8.2 | Score comportamental vs grupo par | `domain/behavioral/behavioral_score.py` | ✅ |
+| 8.3 | Score fiscal unificado | `domain/fiscal/unified_score.py` | ✅ |
+| 8.4 | Grafo de riesgo (conexiones empresariales) | `domain/graph/` | ✅ |
+| 8.5 | Patrones temporales | `domain/behavioral/seasonal.py` | ✅ |
+| 8.6 | Expediente fiscal consolidado | `application/use_cases/generar_expediente_fiscal.py` | ✅ |
+| 8.7 | Endpoints comportamiento y grafo | `routers/behavioral.py` | ✅ |
+| 8.8 | Endpoints fiscalización (reglas + hallazgos) | `routers/fiscalizacion.py` | ✅ |
+| 8.9 | Enriquecimiento COMPLETO en background | `tasks/analisis_task.py` (_enriquecer_nit) | ✅ |
+| 8.10 | Oracle behavioral queries | `infrastructure/mcp/behavioral.py`, `graph.py` | ✅ |
+| **8.11** | **Data R4 — Facturación electrónica** | — | 🟡 Fuente identificada: `GI_G_INTERMEDIA_DIAN` / `GI_G_EXOGENA_INGR_FRA_MUNI` |
+| **8.12** | **Data R5 — Contratos públicos** | — | 🔴 Pendiente: integrar SECOP o equivalente |
+| **8.13** | **Motor acumulativo R8 — Percentiles sectoriales** | — | 🔴 Pendiente: diseño nuevo requerido |
+
+---
+
+## F-09: Oracle Directo (reemplazo MCP)
+
+**Objetivo:** Reemplazar MCP Server stdio por conexión Oracle directa vía oracledb para reducir latencia.
+
+| # | Tarea | Archivos | Estado |
+|---|---|---|---|
+| 9.1 | OracleClient con pool async | `infrastructure/mcp/oracle_adapter.py` | ✅ |
+| 9.2 | Queries Oracle de descubrimiento | `infrastructure/mcp/pagination.py` (4 estrategias) | ✅ |
+| 9.3 | Clasificación post-Oracle | `infrastructure/mcp/classify.py` | ✅ |
+| 9.4 | Pool lifecycle en lifespan | `main.py` | ✅ |
+| 9.5 | Pool global, close() no-op | `oracle_adapter.py` | ✅ |
+
+---
+
 ## Resumen de Esfuerzo
 
 | Fase | Descripción | Estado |
@@ -142,6 +180,8 @@
 | F-05 | LLM Service + Fallback | ✅ |
 | F-06 | Caché + Resiliencia | ✅ |
 | F-07 | Calidad y Automatización | ✅ |
+| F-08 | Análisis Comportamental y Reglas Fiscales | ⚠️ Parcial (motor OK, 3 reglas sin datos) |
+| F-09 | Oracle Directo (reemplazo MCP) | ✅ |
 
 ---
 
@@ -162,7 +202,7 @@
 
 | Recurso | Responsable | Estado |
 |---|---|---|
-| MCP Server con datos Oracle reales | Equipo APEX/Infra | ⏳ |
+| Datos Oracle reales productivos | Equipo APEX/Infra | ⏳ |
 | PostgreSQL 16+ aprovisionado | Equipo Infra | ⏳ |
 | OCI Container Instance | Equipo Infra | ⏳ |
 | API Keys LLM reales (Anthropic) | Equipo | ⏳ |

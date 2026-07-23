@@ -37,8 +37,12 @@ async def test_obtener_datos_fiscales_retorna_dict_completo():
     client.execute_sql.side_effect = [
         [{"nit": "9003189639", "razon_social": "TEST S.A.S.",
           "ciiu": "4711", "regimen": "A", "id_sjto_impsto": 12345}],
-        [{"periodo": "2024", "base_gravable": 50000000, "impuesto": 400000, "vlor_pago": 400000}],
-        [{"periodo": "2024", "ingresos": 120000000}],
+        [{"periodo": "2024", "base_gravable": 50000000, "impuesto": 400000,
+          "vlor_pago": 400000, "ciiu_declarado": None, "tarifa_declarada": None}],
+        [{"periodo": "2024", "ingresos": 120000000,
+          "retenciones_exogena_recibidas": 0, "retenciones_exogena_practicadas": 0}],
+        [],  # DIAN — empty, no match
+        [{"retenciones_declaradas_recibidas": 0, "retenciones_declaradas_practicadas": 0}],  # retenciones detalle
     ]
 
     result = await obtener_datos_fiscales(client, "9003189639", "2024")
@@ -53,7 +57,10 @@ async def test_obtener_datos_fiscales_retorna_dict_completo():
     assert result["declaraciones_ica"][0]["base_gravable"] == 50000000
     assert len(result["exogena_dian"]) == 1
     assert result["exogena_dian"][0]["ingresos"] == 120000000
-    assert client.execute_sql.call_count == 3
+    assert result["retenciones_declaradas_practicadas"] == 0.0
+    assert result["retenciones_exogena_practicadas"] == 0.0
+    assert result["diferencia_pct"] == 0.0
+    assert client.execute_sql.call_count == 5
 
 
 @pytest.mark.asyncio

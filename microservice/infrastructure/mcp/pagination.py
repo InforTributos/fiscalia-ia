@@ -50,7 +50,13 @@ OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
 
 OBTENER_CONTRIBUYENTE_SQL = """
 SELECT s.idntfccion AS nit, p.nmbre_rzon_scial AS razon_social,
-       p.id_actvdad_ecnmca AS ciiu, se.cdgo_sjto_estdo AS regimen,
+       p.id_actvdad_ecnmca AS ciiu,
+       CASE se.cdgo_sjto_estdo
+           WHEN 'A' THEN 'ACTIVO'
+           WHEN 'I' THEN 'INACTIVO'
+           WHEN 'O' THEN 'OMISO_DESCONOCIDO'
+           ELSE ''
+       END AS rues_estado,
        si.id_sjto_impsto
 FROM GENESYS.SI_C_SUJETOS s
 JOIN GENESYS.SI_I_SUJETOS_IMPUESTO si ON s.id_sjto = si.id_sjto
@@ -62,11 +68,19 @@ WHERE s.idntfccion = :nit AND i.cdgo_impsto = 'ICA'
 
 OBTENER_DECLARACIONES_SQL = """
 SELECT d.vgncia AS periodo, d.bse_grvble AS base_gravable,
-       d.vlor_ttal AS impuesto, d.vlor_pago
+       d.vlor_ttal AS impuesto, d.vlor_pago,
+       det_ciiu.vlor AS ciiu_declarado,
+       det_tarifa.vlor AS tarifa_declarada
 FROM GENESYS.GI_G_DECLARACIONES d
 JOIN GENESYS.GI_D_DCLRCNES_VGNCIAS_FRMLR dvf
     ON d.id_dclrcion_vgncia_frmlrio = dvf.id_dclrcion_vgncia_frmlrio
 JOIN GENESYS.GI_D_FORMULARIOS f ON dvf.id_frmlrio = f.id_frmlrio
+LEFT JOIN GENESYS.GI_G_DECLARACIONES_DETALLE det_ciiu
+    ON d.id_dclrcion = det_ciiu.id_dclrcion
+    AND det_ciiu.id_frmlrio_rgion_atrbto IN ({ciiu_ids})
+LEFT JOIN GENESYS.GI_G_DECLARACIONES_DETALLE det_tarifa
+    ON d.id_dclrcion = det_tarifa.id_dclrcion
+    AND det_tarifa.id_frmlrio_rgion_atrbto IN ({tarifa_ids})
 WHERE d.id_sjto_impsto = :id_sjto_impsto
   AND d.vgncia = :periodo
   AND d.cdgo_dclrcion_estdo = 'PRS'
@@ -76,11 +90,42 @@ ORDER BY d.vgncia
 """
 
 OBTENER_EXOGENA_SQL = """
-SELECT vgncia_rtncion AS periodo, SUM(vlor_rtncion) AS ingresos
+SELECT vgncia_rtncion AS periodo,
+       COALESCE(SUM(vlor_bse), 0) AS ingresos,
+       SUM(CASE WHEN cdgo_exgna_tpo_rgstro = 'RD' THEN vlor_rtncion ELSE 0 END) AS retenciones_exogena_recibidas,
+       SUM(CASE WHEN cdgo_exgna_tpo_rgstro = 'RP' THEN vlor_rtncion ELSE 0 END) AS retenciones_exogena_practicadas
 FROM GENESYS.GI_G_EXOGENA_RETENCIONES
 WHERE idntfccion = :nit AND vgncia_rtncion = :periodo
 GROUP BY vgncia_rtncion
 ORDER BY vgncia_rtncion
+"""
+
+DIAN_COMPARACION_SQL = """
+SELECT ciiu, tarifa
+FROM GENESYS.TEMP_RQ_DIAN
+WHERE nit = :nit AND vigencia = :periodo
+"""
+
+OBTENER_RETENCIONES_DETALLE_SQL = """
+SELECT
+  SUM(CASE WHEN det.id_frmlrio_rgion_atrbto IN ({ret_recibidas_ids})
+    THEN TO_NUMBER(CAST(det.vlor AS VARCHAR2(50)), '99999999999999999999D99', 'NLS_NUMERIC_CHARACTERS=''.,''')
+    ELSE 0 END) AS retenciones_declaradas_recibidas,
+  SUM(CASE WHEN det.id_frmlrio_rgion_atrbto IN ({ret_practicadas_ids})
+    THEN TO_NUMBER(CAST(det.vlor AS VARCHAR2(50)), '99999999999999999999D99', 'NLS_NUMERIC_CHARACTERS=''.,''')
+    ELSE 0 END) AS retenciones_declaradas_practicadas
+FROM GENESYS.GI_G_DECLARACIONES d
+JOIN GENESYS.GI_D_DCLRCNES_VGNCIAS_FRMLR dvf
+    ON d.id_dclrcion_vgncia_frmlrio = dvf.id_dclrcion_vgncia_frmlrio
+JOIN GENESYS.GI_D_FORMULARIOS f ON dvf.id_frmlrio = f.id_frmlrio
+LEFT JOIN GENESYS.GI_G_DECLARACIONES_DETALLE det
+    ON d.id_dclrcion = det.id_dclrcion
+    AND det.id_frmlrio_rgion_atrbto IN ({ret_recibidas_ids}, {ret_practicadas_ids})
+WHERE d.id_sjto_impsto = :id_sjto_impsto
+  AND d.vgncia = :periodo
+  AND d.cdgo_dclrcion_estdo = 'PRS'
+  AND d.fcha_anlcion IS NULL
+  AND f.cdgo_frmlrio LIKE 'FUN%'
 """
 
 
@@ -143,22 +188,92 @@ async def obtener_datos_fiscales(client: OracleClient, contribuyente_nit: str, p
 
     declaraciones = []
     exogena = []
+    dian_data = None
+    ret_practicadas_val = 0.0
+    exo_practicadas_val = 0.0
+
     if id_sjto_impsto:
+        # Fetch declaraciones with extended CIIU/tarifa data via LEFT JOINs
+        decl_sql = OBTENER_DECLARACIONES_SQL.format(ciiu_ids=CIIU_IDS, tarifa_ids=TARIFA_IDS)
         declaraciones = await client.execute_sql(
-            OBTENER_DECLARACIONES_SQL,
+            decl_sql,
             {"id_sjto_impsto": id_sjto_impsto, "periodo": periodo},
         )
+        # Normalize: copy tarifa_declarada -> tarifa for backward-compatible generic checks
+        if isinstance(declaraciones, list):
+            for dec in declaraciones:
+                if dec.get("tarifa_declarada") is not None and dec.get("tarifa") is None:
+                    try:
+                        dec["tarifa"] = float(str(dec["tarifa_declarada"]).replace(",", "."))
+                    except (ValueError, TypeError):
+                        pass
+
+        # Fetch exogena data with retenciones breakdown
         exogena = await client.execute_sql(OBTENER_EXOGENA_SQL, {"nit": contribuyente_nit, "periodo": periodo})
 
-    return {
+        # Fetch DIAN comparison data
+        dian_result = await client.execute_sql(DIAN_COMPARACION_SQL, {"nit": contribuyente_nit, "periodo": periodo})
+        if dian_result:
+            dian_row = dian_result[0] if isinstance(dian_result, list) else dian_result
+            dian_data = {
+                "ciiu": str(dian_row.get("ciiu", "") or ""),
+                "tarifa": _parse_tarifa(dian_row.get("tarifa")),
+            }
+
+        # Fetch declared retentions from GI_G_DECLARACIONES_DETALLE (aggregated)
+        ret_sql = OBTENER_RETENCIONES_DETALLE_SQL.format(
+            ret_recibidas_ids=RET_RECIBIDAS_IDS,
+            ret_practicadas_ids=RET_PRACTICADAS_IDS,
+        )
+        ret_result = await client.execute_sql(ret_sql, {"id_sjto_impsto": id_sjto_impsto, "periodo": periodo})
+        if ret_result:
+            ret_row = ret_result[0] if isinstance(ret_result, list) else ret_result
+            ret_practicadas_val = float(ret_row.get("retenciones_declaradas_practicadas", 0) or 0)
+
+    # Extract exogena practiced retentions from first exogena row
+    if exogena:
+        exo_row = exogena[0] if isinstance(exogena, list) else exogena
+        exo_practicadas_val = float(exo_row.get("retenciones_exogena_practicadas", 0) or 0)
+
+    # Calculate diferencia_pct between declared and exogena practiced retentions
+    diferencia_pct = 0.0
+    if ret_practicadas_val > 0 and exo_practicadas_val > 0:
+        diferencia_pct = abs(exo_practicadas_val - ret_practicadas_val) / max(ret_practicadas_val, exo_practicadas_val, 1) * 100
+
+    # Build result dict
+    result = {
         "contribuyente_nit": row.get("nit", contribuyente_nit),
         "razon_social": row.get("razon_social", ""),
         "ciiu": str(row.get("ciiu", "") or ""),
         "regimen": row.get("regimen", ""),
         "declaraciones_ica": declaraciones if isinstance(declaraciones, list) else [],
         "exogena_dian": exogena if isinstance(exogena, list) else [],
-        "rues_estado": "",
+        "rues_estado": row.get("rues_estado", ""),
+        "retenciones_declaradas_practicadas": ret_practicadas_val,
+        "retenciones_exogena_practicadas": exo_practicadas_val,
+        "diferencia_pct": round(diferencia_pct, 2),
     }
+
+    if dian_data:
+        result["ciiu_dian"] = dian_data["ciiu"]
+        result["tarifa_dian"] = dian_data["tarifa"]
+
+    return result
+
+
+def _parse_tarifa(val) -> float:
+    """Parse tarifa value from Oracle, handling per-mille integers and decimal strings."""
+    if val is None:
+        return 0.0
+    try:
+        raw = str(val).replace(",", ".").strip()
+        parsed = float(raw)
+        # If it looks like a per-mille integer (e.g., 8 means 0.008), convert to decimal
+        if parsed > 1:
+            parsed = parsed / 1000.0
+        return parsed
+    except (ValueError, TypeError):
+        return 0.0
 
 
 OMISOS_CONOCIDOS_SQL = """
@@ -487,3 +602,61 @@ async def contar_inexactos_retenciones(client: OracleClient, periodo, umbral_pct
         return 0
     row = result[0] if isinstance(result, list) else result
     return row.get("cnt", 0) or 0
+
+
+async def cargar_tarifas_desde_oracle(client: OracleClient, periodo: str) -> dict[str, float]:
+    """
+    Load CIIU tarifas from Oracle declarations data.
+    For each CIIU code with declarations, compute the most common tarifa.
+    Falls back to TARIFAS_CIIU_DEFAULT if Oracle is unavailable.
+    """
+    TARIFA_REF_IDS = "2107, 4371, 4874"
+    sql = f"""
+    SELECT p.id_actvdad_ecnmca AS ciiu,
+           det.vlor AS tarifa_str,
+           COUNT(*) AS frecuencia
+    FROM GENESYS.GI_G_DECLARACIONES d
+    JOIN GENESYS.GI_D_DCLRCNES_VGNCIAS_FRMLR dvf
+        ON d.id_dclrcion_vgncia_frmlrio = dvf.id_dclrcion_vgncia_frmlrio
+    JOIN GENESYS.GI_D_FORMULARIOS frm ON dvf.id_frmlrio = frm.id_frmlrio
+    JOIN GENESYS.SI_I_SUJETOS_IMPUESTO si ON d.id_sjto_impsto = si.id_sjto_impsto
+    JOIN GENESYS.SI_I_PERSONAS p ON si.id_sjto_impsto = p.id_sjto_impsto
+    JOIN GENESYS.GI_G_DECLARACIONES_DETALLE det
+        ON d.id_dclrcion = det.id_dclrcion
+        AND det.id_frmlrio_rgion_atrbto IN ({TARIFA_REF_IDS})
+    WHERE d.vgncia = :periodo
+      AND d.cdgo_dclrcion_estdo = 'PRS'
+      AND d.fcha_anlcion IS NULL
+      AND frm.cdgo_frmlrio LIKE 'FUN%'
+      AND p.id_actvdad_ecnmca IS NOT NULL
+      AND REGEXP_LIKE(det.vlor, '^[0-9]+([.,][0-9]+)?$')
+    GROUP BY p.id_actvdad_ecnmca, det.vlor
+    ORDER BY p.id_actvdad_ecnmca, COUNT(*) DESC
+    """
+    try:
+        rows = await client.execute_sql(sql, {"periodo": periodo})
+        if not rows:
+            logger.warning("cargar_tarifas_desde_oracle: no rows returned for periodo=%s", periodo)
+            return {}
+
+        tarifas: dict[str, float] = {}
+        for row in rows:
+            ciiu = str(row.get("ciiu", "") or "").strip()
+            if not ciiu:
+                continue
+            if ciiu not in tarifas:
+                # First row per CIIU has highest COUNT(*) → most common tarifa
+                tarifa_str = str(row.get("tarifa_str", "0") or "0").replace(",", ".").strip()
+                try:
+                    tarifa_val = float(tarifa_str)
+                    if tarifa_val > 1:
+                        tarifa_val = tarifa_val / 1000.0
+                    tarifas[ciiu] = tarifa_val
+                except (ValueError, TypeError):
+                    continue
+
+        logger.info("cargar_tarifas_desde_oracle: %d tarifas cargadas para periodo=%s", len(tarifas), periodo)
+        return tarifas
+    except Exception as e:
+        logger.warning("cargar_tarifas_desde_oracle: error — %s", e)
+        return {}

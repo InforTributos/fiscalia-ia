@@ -64,7 +64,7 @@ de mensajería — el microservicio ejecuta SQL directamente sobre la base de da
 │   • SI_I_PERSONAS — datos de personas                   │
 │   • SI_I_SUJETOS_IMPUESTO — relación sujeto-impuesto   │
 │   • GI_G_DECLARACIONES — declaraciones ICA              │
-│   • GI_G_EXOGENA_RETENCIONES — exógena DIAN            │
+│   • GI_G_EXOGENA_RETENCIONES — exógena MUNICIPAL de retenciones ICA    │
 │   • GI_D_FORMULARIOS — tipos de formulario              │
 │   • FI_G_CANDIDATOS — candidatos de fiscalización       │
 │   • DF_C_IMPUESTOS — catálogo de impuestos              │

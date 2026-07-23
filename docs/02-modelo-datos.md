@@ -1,17 +1,17 @@
 # Modelo de Datos — FiscalIA
 
-> **Nota:** Este documento describe el modelo de datos **PostgreSQL** del microservicio Python, que reemplaza completamente el anterior modelo Oracle (`FISCAL_*` tables). La base de datos Oracle 19c+ del lado de Taxation Smart continúa existiendo como fuente de datos fiscales (consultada vía MCP Server), pero el estado de procesos, resultados MCP y resultados de análisis IA se persisten exclusivamente en PostgreSQL.
+> **Nota:** Este documento describe el modelo de datos **PostgreSQL** del microservicio Python, que reemplaza completamente el anterior modelo Oracle (`FISCAL_*` tables). La base de datos Oracle 19c+ del lado de Taxation Smart continúa existiendo como fuente de datos fiscales (consultada directamente vía oracledb pool asíncrono), pero el estado de procesos, resultados de consulta Oracle y resultados de análisis IA se persisten exclusivamente en PostgreSQL.
 
 ## 1. Descripción General
 
-La base de datos PostgreSQL del microservicio consta de **7 tablas principales** que cubren el ciclo de vida completo de un proceso de fiscalización: desde la creación del proceso por parte de una entidad fiscalizadora, pasando por la obtención y clasificación de NITs vía MCP, hasta el análisis con LLM, el registro detallado de errores y la persistencia de hallazgos fiscales.
+La base de datos PostgreSQL del microservicio consta de **7 tablas principales** que cubren el ciclo de vida completo de un proceso de fiscalización: desde la creación del proceso por parte de una entidad fiscalizadora, pasando por la obtención y clasificación de NITs vía Oracle Database, hasta el análisis con LLM, el registro detallado de errores y la persistencia de hallazgos fiscales.
 
 | Tabla | Propósito | Granularidad |
 |-------|-----------|-------------|
 | `entidades_fiscalizadoras` | Consumidores de la API (auditores/fiscalizadores) | 1 fila por entidad fiscalizadora |
 | `procesos` | Cada criterio de fiscalización ejecutado | 1 fila por proceso |
 | `proceso_intentos` | Cada ejecución o re-lanzamiento de un proceso | 1 fila por intento |
-| `proceso_detalle` | NITs obtenidos del MCP y analizados por IA | 1 fila por NIT por intento |
+| `proceso_detalle` | NITs obtenidos de Oracle y analizados por IA | 1 fila por NIT por intento |
 | `proceso_errores` | Errores a nivel de proceso por intento | 1 fila por error |
 | `proceso_detalle_errores` | Errores por NIT en el detalle | 1 fila por error |
 | `hallazgos_fiscales` | Hallazgos fiscales detectados por reglas (R01-R10) | 1 fila por hallazgo |
@@ -80,7 +80,7 @@ CREATE TABLE procesos (
 | `nombre` | `VARCHAR(200)` | Nombre descriptivo del proceso |
 | `estado` | `VARCHAR(30)` | Estado actual del proceso (ver §4) |
 | `criteria` | `JSONB` | Criterios de búsqueda (vigencia, régimen, CIIU, período) |
-| `total_nits` | `INTEGER` | Total de NITs obtenidos del MCP |
+| `total_nits` | `INTEGER` | Total de NITs obtenidos de Oracle |
 | `candidatos` | `INTEGER` | NITs marcados como candidatos por el MCP |
 | `omisos` | `INTEGER` | NITs clasificados como omisos |
 | `exactos` | `INTEGER` | NITs clasificados como exactos (descartados) |
@@ -138,7 +138,7 @@ CREATE INDEX idx_proceso_intentos_estado ON proceso_intentos(estado);
 
 ### 2.4. `proceso_detalle`
 
-Registro detallado de cada NIT obtenido del MCP, su clasificación (omiso/exacto/inexacto), los resultados del análisis del LLM (hallazgos, SRF, explicación) y métricas de consumo de tokens.
+Registro detallado de cada NIT obtenido de Oracle, su clasificación (omiso/exacto/inexacto), los resultados del análisis del LLM (hallazgos, SRF, explicación) y métricas de consumo de tokens.
 
 ```sql
 CREATE TABLE proceso_detalle (
@@ -174,7 +174,7 @@ CREATE TABLE proceso_detalle (
 | `razon_social` | `VARCHAR(500)` | Razón social del contribuyente |
 | `ciiu` | `VARCHAR(10)` | Código CIIU de la actividad económica |
 | `mcp_score` | `DECIMAL(10,2)` | Score/peso asignado por el MCP al contribuyente |
-| `es_candidato` | `BOOLEAN` | Indica si el MCP marcó al contribuyente como candidato a fiscalización |
+| `es_candidato` | `BOOLEAN` | Indica si Oracle Database marcó al contribuyente como candidato a fiscalización |
 | `mcp_razon` | `TEXT` | Razón proporcionada por el MCP para el score asignado |
 | `clasificacion` | `VARCHAR(20)` | Clasificación del NIT: `OMISO`, `EXACTO`, `INEXACTO` |
 | `detalle_clasificacion` | `TEXT` | Detalle o justificación de la clasificación |
@@ -185,7 +185,7 @@ CREATE TABLE proceso_detalle (
 | `tokens_entrada` | `INTEGER` | Tokens consumidos en el prompt enviado al LLM |
 | `tokens_salida` | `INTEGER` | Tokens generados en la respuesta del LLM |
 | `costo_estimado` | `DECIMAL(10,4)` | Costo estimado en USD del análisis |
-| `pagina` | `INTEGER` | Número de página MCP donde se obtuvo este NIT |
+| `pagina` | `INTEGER` | Número de página de Oracle donde se obtuvo este NIT |
 | `created_at` | `TIMESTAMP` | Fecha y hora de registro |
 
 **Índices:**
@@ -201,7 +201,7 @@ CREATE INDEX idx_proceso_detalle_clasificacion ON proceso_detalle(clasificacion)
 
 ### 2.5. `proceso_errores`
 
-Errores a nivel de proceso por intento. Captura fallos en la comunicación con MCP, Oracle, LLM, PostgreSQL o en la orquestación general.
+Errores a nivel de proceso por intento. Captura fallos en la comunicación con Oracle, LLM, PostgreSQL o en la orquestación general.
 
 ```sql
 CREATE TABLE proceso_errores (
@@ -275,7 +275,7 @@ CREATE INDEX idx_detalle_errores_detalle ON proceso_detalle_errores(detalle_id);
 
 ### 2.7. `hallazgos_fiscales`
 
-Hallazgos fiscales detectados por el motor de reglas (R01-R10). Cada hallazgo representa una inconsistencia o incumplimiento específico por contribuyente y período. Tablas relacionadas: `hallazgo_evidencias`, `hallazgo_revisiones`, `hallazgo_revisiones_agente`.
+Hallazgos fiscales detectados por el motor de reglas (R01-R10). Cada hallazgo representa una inconsistencia o incumplimiento específico por contribuyente y período.
 
 ```sql
 CREATE TABLE hallazgos_fiscales (
@@ -310,14 +310,14 @@ CREATE TABLE hallazgos_fiscales (
 | `regla` | `VARCHAR(20)` | Código de la regla fiscal que detectó el hallazgo (R01-R10) |
 | `periodo` | `VARCHAR(20)` | Período fiscal del hallazgo (YYYY o YYYY-MM) |
 | `tipo_hallazgo` | `VARCHAR(40)` | Tipo: `OMISION`, `INCONSISTENCIA_CIIU`, `INCONSISTENCIA_RETENCIONES`, `CAIDA_BSA`, `ANOMALIA_COMPORTAMENTAL` |
-| `fuerza_probatoria` | `VARCHAR(20)` | Nivel: `ALTA`, `MEDIA`, `BAJA`. Según fuente y consistencia de los datos |
+| `fuerza_probatoria` | `VARCHAR(20)` | Nivel: `DIRECTA` (prueba contundente), `MEDIA` (evidencia sólida), `INDICIARIA` (señal estadística). Según la regla fiscal que originó el hallazgo |
 | `brecha_valor` | `DECIMAL(18,2)` | Diferencia monetaria estimada (COP) entre lo declarado y lo real |
 | `impuesto_estimado` | `DECIMAL(18,2)` | Monto estimado del impuesto adeudado (COP) |
-| `score` | `DECIMAL(5,2)` | Score de confianza del hallazgo (0.00 a 1.00) |
+| `score` | `DECIMAL(5,2)` | Score del hallazgo (0.00 a 100.00) |
 | `score_componentes` | `JSONB` | Desglose JSON del score: regla, comportamiento, temporal, SRF |
 | `ventana_limite` | `DATE` | Fecha límite para acción de fiscalización (prescripción) |
 | `accionable` | `BOOLEAN` | TRUE si el hallazgo es accionable para cobro/fiscalización |
-| `estado` | `VARCHAR(30)` | Estado: `DETECTADO`, `EN_REVISION`, `CONFIRMADO`, `DESCARTADO`, `PRESCRITO` |
+| `estado` | `VARCHAR(30)` | Estado: `DETECTADO`, `EN_REVISION`, `CONFIRMADO`, `DESCARTADO`, `RECLASIFICADO` |
 | `resumen` | `TEXT` | Resumen textual del hallazgo generado por IA |
 | `metadata` | `JSONB` | Metadatos JSON: cálculos intermedios, datos crudos, config de reglas |
 | `created_at` | `TIMESTAMP` | Fecha y hora de creación del hallazgo |
@@ -468,7 +468,7 @@ erDiagram
 | Estado | Significado |
 |--------|-------------|
 | `PENDIENTE` | Proceso creado, esperando ejecución |
-| `PREFILTRANDO` | El MCP está obteniendo NITs con paginación |
+| `PREFILTRANDO` | Oracle Database está obteniendo NITs con paginación |
 | `PREFILTRADO_COMPLETADO` | NITs obtenidos y clasificados, análisis IA encolado |
 | `EN_COLA` | Esperando worker disponible (Procrastinate) |
 | `EN_PROCESO` | Análisis IA en ejecución sobre los NITs |
@@ -481,9 +481,9 @@ erDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> PENDIENTE: POST /proceso
-    PENDIENTE --> PREFILTRANDO: Inicia MCP
-    PREFILTRANDO --> PREFILTRADO_COMPLETADO: MCP completa
-    PREFILTRANDO --> ERROR: MCP falla
+    PENDIENTE --> PREFILTRANDO: Inicia consulta Oracle
+    PREFILTRANDO --> PREFILTRADO_COMPLETADO: Oracle completa
+    PREFILTRANDO --> ERROR: Oracle falla
     PREFILTRADO_COMPLETADO --> EN_COLA: Background task encolada
     EN_COLA --> EN_PROCESO: Worker disponible
     EN_PROCESO --> COMPLETADO: Todos los NITs OK
@@ -528,7 +528,7 @@ El modelo utiliza una arquitectura hexagonal/DDD donde cada error se clasifica s
 
 | Capa | Códigos de ejemplo | Descripción |
 |------|--------------------|-------------|
-| `MCP` | `MCP_TIMEOUT`, `MCP_CONN_REFUSED`, `MCP_PAGE_ERROR` | Errores de conexión o comunicación con el MCP Server (FastMCP stdio) |
+| `MCP` | `MCP_TIMEOUT`, `MCP_CONN_REFUSED`, `MCP_PAGE_ERROR` | Errores de conexión o comunicación con Oracle Database (datos fiscales) |
 | `ORACLE` | `ORACLE_QUERY_FAIL`, `ORACLE_TIMEOUT`, `ORACLE_NIT_NOT_FOUND` | Errores en consultas a Oracle Database 19c+ (datos fiscales) |
 | `LLM` | `LLM_TIMEOUT`, `LLM_RATE_LIMIT`, `LLM_INVALID_JSON`, `LLM_ALL_PROVIDERS_FAILED` | Errores en API de proveedores LLM (cualquier tier) |
 | `POSTGRES` | `PG_CONN_ERROR`, `PG_INSERT_FAIL` | Errores de persistencia en PostgreSQL |
@@ -540,7 +540,7 @@ El modelo utiliza una arquitectura hexagonal/DDD donde cada error se clasifica s
 | Tipo de error | Granularidad | Ejemplo |
 |---------------|-------------|---------|
 | Timeout LLM para un NIT (todos los providers fallaron) | 1 error por NIT | `LLM_ALL_PROVIDERS_FAILED` |
-| Datos faltantes del MCP | 1 error por NIT | `MCP_DATA_INCOMPLETE` |
+| Datos faltantes de Oracle | 1 error por NIT | `MCP_DATA_INCOMPLETE` |
 | NIT no encontrado en Oracle | 1 error por NIT | `ORACLE_NIT_NOT_FOUND` |
 | Múltiples validaciones fallidas | Múltiples por NIT | `VALIDACION_CIIU` + `VALIDACION_PERIODO` |
 
@@ -555,3 +555,58 @@ db/migrations/001_create_tables.sql
 ```
 
 Incluye la creación de todas las tablas, relaciones, índices y la política de retención (job mensual).
+
+---
+
+## Apéndice A: Tablas Oracle (GENESYS) — Fuentes de Datos Fiscales
+
+El microservicio consulta las siguientes tablas del esquema Oracle `GENESYS` para obtener datos fiscales de los contribuyentes. La conexión es directa vía `python-oracledb` pool asíncrono.
+
+### A.1. Tablas de Declaraciones
+
+| Tabla | Propósito | Columnas clave |
+|-------|-----------|----------------|
+| `GI_G_DECLARACIONES` | Declaraciones de ICA presentadas al municipio | `ID_SJTO_IMPSTO` → sujeto, `VGNCIA` (vigencia), `ID_PRDO` (período), `BSE_GRVBLE` (base gravable), `VLOR_TTAL` (impuesto), `cdgo_dclrcion_estdo` (estado: PRS=presentada) |
+| `GI_G_DECLARACIONES_DETALLE` | Detalle de cada declaración (retenciones por atributo) | `ID_DCLRCION`, `ID_FRMLRIO_RGION_ATRBTO` (atributo), `VLOR` (valor) |
+
+### A.2. Tablas de Exógena Municipal (ICA)
+
+Todas las tablas exógena municipal cuelgan conceptualmente de `GI_G_INFORMACION_EXOGENA` (tabla padre), pero actualmente los datos se cargan directamente en las tablas detalle.
+
+| Tabla | Archivo | Propósito | Registros | ¿Tiene NIT directo? |
+|-------|---------|-----------|-----------|---------------------|
+| `GI_G_EXOGENA_RETENCIONES` | Archivo 1 y 2 | Retenciones de ICA practicadas (Archivo 1) y recibidas (Archivo 2) | 281k | **Sí** — columna `IDNTFCCION` |
+| `GI_G_EXOGENA_INGR_FRA_MUNI` | Archivo 3 | Ingresos obtenidos por fuera del municipio (territorialidad) | 183k | No — solo `ID_INFRMCION_EXGNA` |
+| `GI_G_EXOGENA_INGR_NO_GRAVDS` | Archivo 4 | Ingresos no gravados con ICA | 1.6M | **Sí** — columna `IDNTFCCION` |
+
+**Campos clave de `GI_G_EXOGENA_RETENCIONES`:**
+
+| Columna | Descripción | Uso |
+|---------|-------------|-----|
+| `VLOR_BSE` | Base de la operación (ingreso real del contribuyente) | **R3** — `SUM(vlor_bse)` con filtro `cdgo_exgna_tpo_rgstro = 'RD'` |
+| `VLOR_RTNCION` | Valor de la retención calculado | Comparación retenciones declaradas vs exógena |
+| `TRFA` | Tarifa aplicada (per-mille, ej: 10 = 1.0%) | Cálculos auxiliares |
+| `CDGO_EXGNA_TPO_RGSTRO` | Tipo: `'RD'` (retención recibida) o `'RP'` (retención practicada) | Para R3 solo importa `'RD'` |
+| `DSCRPCION_CNCPTO` | Descripción del concepto (ej: "701 - Retención por Compras") | Depuración |
+
+> **⚠️ Bug histórico corregido (2026-07-23):** Originalmente `R3` usaba `SUM(vlor_rtncion)` en vez de `SUM(vlor_bse)`, y no filtraba por `cdgo_exgna_tpo_rgstro = 'RD'`. Esto causaba que se compararan retenciones ($40k) contra bases declaradas ($100M) — magnitudes inconmensurables. Adicionalmente, `pagination.py` usaba los códigos incorrectos `'RECIBIDA'` y `'PRACTICADA'` en los CASE cuando los valores reales son `'RD'` y `'RP'`.
+
+### A.3. Tablas de DIAN
+
+| Tabla | Propósito | Columnas clave |
+|-------|-----------|----------------|
+| `GI_G_INTERMEDIA_DIAN` | Intermediación DIAN — datos que la DIAN consolida sobre el contribuyente (facturación electrónica, RUT) y pone a disposición del municipio | `IDNTFCCION` (NIT), `VGNCIA_GRVBLE` (vigencia), `PRDO_GRVBLE` (período), `TTAL_INGRSOS_GRVBLE` (ingresos gravables ICA), `PGO_TTAL_ICAC` (pago ICA), `DRCCION_SCCNAL` (dirección seccional DIAN) |
+| `TEMP_RQ_DIAN` | Datos temporales de DIAN para cruce CIIU/tarifa | `NIT`, `VIGENCIA`, `CIIU`, `TARIFA`, `VALOR_DIAN` |
+
+### A.4. Tablas Maestras
+
+| Tabla | Propósito |
+|-------|-----------|
+| `SI_C_SUJETOS` | Sujetos/contribuyentes (datos básicos: NIT, dirección, municipio) |
+| `SI_I_SUJETOS_IMPUESTO` | Relación sujeto ↔ impuesto (un contribuyente puede tener ICA, Predial, etc.) |
+| `SI_I_PERSONAS` | Datos extendidos del contribuyente (razón social, CIIU, régimen) |
+| `DF_C_IMPUESTOS` | Catálogo de impuestos (ICA=102, Predial=101, etc.) |
+| `DF_S_CLIENTES` | Clientes del sistema (municipios). Valledupar = `CDGO_CLNTE=10` |
+| `DF_S_SUJETOS_ESTADO` | Estados del contribuyente (A=ACTIVO, I=INACTIVO, O=OMISO) |
+| `DF_I_PERIODOS` | Períodos fiscales por impuesto y vigencia |
+| `DF_I_EXOGENA_ARCHIVO_TIPO` | Tipos de archivo de exógena municipal (1=retenciones practicadas, 2=retenciones recibidas, 3=ingresos fuera del municipio, 4=ingresos no gravados) |
