@@ -7,5 +7,36 @@ services:
     env_file:
       - .env
     environment:
-      - POSTGRES_HOST=172.17.0.1
+      - POSTGRES_HOST=postgres
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - appnet
+
+  postgres:
+    image: infortributos/postgres:16-alpine
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: fiscalia
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d fiscalia"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - appnet
+
+volumes:
+  pgdata:
+    name: fiscalia_pgdata
+
+networks:
+  appnet:
+    driver: bridge
