@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>FiscalIA — Manual de Implementación API</title>
+<style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.65;
+  color: #1a1a1a;
+  margin: 0; padding: 0;
+}
+
+/* ── Cover Page ── */
+.cover {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  text-align: center;
+  page-break-after: always;
+  padding: 40px;
+}
+.cover h1 {
+  font-size: 28pt;
+  color: #0d1b2a;
+  border: none;
+  margin-bottom: 10px;
+  padding-bottom: 0;
+}
+.cover h2 {
+  font-size: 20pt;
+  color: #1565c0;
+  border: none;
+  margin-bottom: 40px;
+  padding-bottom: 0;
+}
+.cover .divider {
+  width: 120px;
+  height: 3px;
+  background: #1565c0;
+  margin: 0 auto;
+}
+
+/* ── TOC ── */
+#toc {
+  page-break-after: always;
+  padding-top: 20px;
+}
+#toc h2 {
+  font-size: 18pt; color: #0d1b2a;
+  border-bottom: 3px solid #1565c0;
+  padding-bottom: 8px; margin-bottom: 20px;
+}
+.toc-list {
+  list-style: none; padding: 0; margin: 0;
+}
+.toc-item {
+  margin: 0; padding: 0;
+}
+.toc-item a {
+  display: block;
+  padding: 6px 0 6px 0;
+  color: #1a1a1a;
+  text-decoration: none;
+  border-bottom: 1px dotted #ddd;
+  font-size: 10.5pt;
+  transition: background 0.15s;
+}
+.toc-item a:hover {
+  background: #e3f2fd;
+}
+/* h2 entries: bold, larger */
+.toc-item a {
+  font-weight: 600;
+  color: #0d1b2a;
+}
+/* h3 entries: indented, normal weight */
+.toc-indent-1 a {
+  padding-left: 20px;
+  font-weight: 400;
+  color: #333;
+  font-size: 10pt;
+}
+/* h4 entries: double indented, smaller */
+.toc-indent-2 a {
+  padding-left: 40px;
+  font-weight: 400;
+  color: #555;
+  font-size: 9.5pt;
+}
+
+/* ── Headings ── */
+h1 {
+  font-size: 20pt; color: #0d1b2a;
+  border-bottom: 3px solid #1565c0;
+  padding-bottom: 8px; margin-top: 32px;
+}
+h2 {
+  font-size: 15pt; color: #1565c0;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 4px; margin-top: 28px;
+}
+h3 {
+  font-size: 12pt; color: #2e7d32;
+  margin-top: 20px;
+}
+h4 {
+  font-size: 11pt; color: #e65100;
+  margin-top: 16px;
+}
+
+/* ── Tables ── */
+table {
+  width: 100%; border-collapse: collapse;
+  margin: 12px 0; font-size: 9.5pt;
+}
+th {
+  background-color: #0d1b2a; color: #fff;
+  padding: 7px 10px; text-align: left; font-weight: 600;
+}
+td {
+  padding: 5px 10px; border-bottom: 1px solid #e0e0e0;
+  vertical-align: top; color: #1a1a1a;
+}
+tr:nth-child(even) { background-color: #f8f9fa; }
+
+/* ── Code ── */
+code {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  background: #f0f0f0; padding: 1px 5px; border-radius: 3px;
+  font-size: 9.5pt; color: #b71c1c;
+}
+pre {
+  background: #1e1e2e; color: #cdd6f4;
+  padding: 14px 16px; border-radius: 6px;
+  font-size: 8.5pt; line-height: 1.5;
+  margin: 12px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  page-break-inside: avoid;
+}
+pre code {
+  background: transparent; color: #cdd6f4;
+  padding: 0; font-size: 8.5pt;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Blockquote ── */
+blockquote {
+  border-left: 4px solid #1976d2;
+  margin: 14px 0; padding: 10px 16px;
+  background: #e8f4fd; color: #0d47a1;
+  border-radius: 0 6px 6px 0;
+  font-style: italic;
+}
+blockquote strong { color: #0d47a1; }
+
+/* ── Lists ── */
+ul, ol { margin: 8px 0; padding-left: 24px; }
+li { margin-bottom: 4px; }
+
+/* ── Misc ── */
+strong { color: #0d1b2a; }
+hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }
+p { margin: 6px 0; }
+a { color: #1565c0; text-decoration: none; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #f8fafb; border: 1px solid #cfd8dc;
+  border-radius: 8px; padding: 12px;
+  margin: 14px 0; text-align: center;
+  page-break-inside: auto;
+  overflow: visible;
+}
+.mermaid svg {
+  max-width: 100%; height: auto;
+  max-height: 500px;
+}
+</style>
+</head>
+<body>
+<div class="cover">
+  <h1>Manual de Implementación</h1>
+  <h2>FiscalIA API</h2>
+  <div class="divider"></div>
+</div>
+<nav id="toc">
+<ul class="toc-list">
+<li class="toc-item"><a href="#1-descripcion-general">1. Descripción General</a></li>
+<li class="toc-item"><a href="#2-arquitectura">2. Arquitectura</a></li>
+<li class="toc-item toc-indent-1"><a href="#2-1-diagrama-de-capas">2.1. Diagrama de Capas</a></li>
+<li class="toc-item toc-indent-1"><a href="#2-2-arbol-del-proyecto">2.2. Árbol del Proyecto</a></li>
+<li class="toc-item"><a href="#3-prerrequisitos">3. Prerrequisitos</a></li>
+<li class="toc-item toc-indent-1"><a href="#api-keys-necesarias">API Keys necesarias</a></li>
+<li class="toc-item"><a href="#4-instalacion-local">4. Instalación Local</a></li>
+<li class="toc-item toc-indent-1"><a href="#4-1-clonar-el-repositorio">4.1. Clonar el repositorio</a></li>
+<li class="toc-item toc-indent-1"><a href="#4-2-crear-entorno-virtual">4.2. Crear entorno virtual</a></li>
+<li class="toc-item toc-indent-1"><a href="#4-3-instalar-dependencias">4.3. Instalar dependencias</a></li>
+<li class="toc-item toc-indent-1"><a href="#4-4-configurar-variables-de-entorno">4.4. Configurar variables de entorno</a></li>
+<li class="toc-item toc-indent-1"><a href="#4-5-verificar-instalacion">4.5. Verificar instalación</a></li>
+<li class="toc-item toc-indent-1"><a href="#4-6-ejecutar-el-servidor">4.6. Ejecutar el servidor</a></li>
+<li class="toc-item"><a href="#5-configuracion-de-variables-de-entorno">5. Configuración de Variables de Entorno</a></li>
+<li class="toc-item toc-indent-1"><a href="#5-1-variables-obligatorias">5.1. Variables Obligatorias</a></li>
+<li class="toc-item toc-indent-1"><a href="#5-2-variables-opcionales-con-defaults">5.2. Variables Opcionales (con defaults)</a></li>
+<li class="toc-item toc-indent-1"><a href="#5-3-validacion-al-startup">5.3. Validación al Startup</a></li>
+<li class="toc-item toc-indent-1"><a href="#5-4-configuracion-por-ambiente">5.4. Configuración por Ambiente</a></li>
+<li class="toc-item"><a href="#6-base-de-datos-postgresql">6. Base de Datos PostgreSQL</a></li>
+<li class="toc-item toc-indent-1"><a href="#6-1-tablas-del-sistema">6.1. Tablas del Sistema</a></li>
+<li class="toc-item toc-indent-1"><a href="#6-2-diagrama-er">6.2. Diagrama ER</a></li>
+<li class="toc-item toc-indent-1"><a href="#6-3-ejecutar-migraciones">6.3. Ejecutar Migraciones</a></li>
+<li class="toc-item toc-indent-1"><a href="#6-4-politica-de-retencion">6.4. Política de Retención</a></li>
+<li class="toc-item"><a href="#7-api-endpoints">7. API Endpoints</a></li>
+<li class="toc-item toc-indent-1"><a href="#7-1-health-check">7.1. Health Check</a></li>
+<li class="toc-item toc-indent-1"><a href="#7-2-entidades-fiscalizadoras">7.2. Entidades Fiscalizadoras</a></li>
+<li class="toc-item toc-indent-1"><a href="#7-3-procesos-de-fiscalizacion">7.3. Procesos de Fiscalización</a></li>
+<li class="toc-item toc-indent-2"><a href="#post-proceso-crear-proceso-asincrono">POST /proceso — Crear proceso asíncrono</a></li>
+<li class="toc-item toc-indent-2"><a href="#get-proceso-id-status-consultar-estado">GET /proceso/{id}/status — Consultar estado</a></li>
+<li class="toc-item toc-indent-2"><a href="#get-proceso-id-results-consultar-resultados">GET /proceso/{id}/results — Consultar resultados</a></li>
+<li class="toc-item toc-indent-2"><a href="#get-proceso-id-errors-consultar-errores">GET /proceso/{id}/errors — Consultar errores</a></li>
+<li class="toc-item toc-indent-2"><a href="#get-proceso-id-export-exportar-a-xlsx">GET /proceso/{id}/export — Exportar a XLSX</a></li>
+<li class="toc-item toc-indent-1"><a href="#7-4-analisis-individual">7.4. Análisis Individual</a></li>
+<li class="toc-item toc-indent-1"><a href="#7-5-analisis-comportamental">7.5. Análisis Comportamental</a></li>
+<li class="toc-item toc-indent-2"><a href="#get-contribuyente-nit-comportamiento">GET /contribuyente/{nit}/comportamiento</a></li>
+<li class="toc-item toc-indent-2"><a href="#get-contribuyente-nit-grafo-riesgo">GET /contribuyente/{nit}/grafo-riesgo</a></li>
+<li class="toc-item toc-indent-1"><a href="#7-6-fiscalizacion-reglas-r01-r10">7.6. Fiscalización (Reglas R01-R10)</a></li>
+<li class="toc-item toc-indent-2"><a href="#post-fiscalizacion-reglas-evaluar-nit">POST /fiscalizacion/reglas/evaluar/{nit}</a></li>
+<li class="toc-item toc-indent-2"><a href="#get-fiscalizacion-hallazgos-listar-hallazgos">GET /fiscalizacion/hallazgos — Listar hallazgos</a></li>
+<li class="toc-item"><a href="#8-ejemplos-de-uso">8. Ejemplos de Uso</a></li>
+<li class="toc-item toc-indent-1"><a href="#8-1-curl-crear-proceso">8.1. curl — Crear proceso</a></li>
+<li class="toc-item toc-indent-1"><a href="#8-2-curl-consultar-estado">8.2. curl — Consultar estado</a></li>
+<li class="toc-item toc-indent-1"><a href="#8-3-curl-consultar-resultados">8.3. curl — Consultar resultados</a></li>
+<li class="toc-item toc-indent-1"><a href="#8-4-curl-analisis-individual">8.4. curl — Análisis individual</a></li>
+<li class="toc-item toc-indent-1"><a href="#8-5-curl-evaluar-reglas-fiscales">8.5. curl — Evaluar reglas fiscales</a></li>
+<li class="toc-item toc-indent-1"><a href="#8-6-curl-exportar-resultados">8.6. curl — Exportar resultados</a></li>
+<li class="toc-item toc-indent-1"><a href="#8-7-python-conexion-desde-apex-via-requests">8.7. Python — Conexión desde APEX/vía requests</a></li>
+<li class="toc-item toc-indent-1"><a href="#8-8-pl-sql-desde-oracle-apex">8.8. PL/SQL — Desde Oracle APEX</a></li>
+<li class="toc-item"><a href="#9-sistema-de-fallback-llm">9. Sistema de Fallback LLM</a></li>
+<li class="toc-item toc-indent-1"><a href="#9-1-cadena-de-fallback">9.1. Cadena de Fallback</a></li>
+<li class="toc-item toc-indent-1"><a href="#9-2-configuracion-de-providers">9.2. Configuración de Providers</a></li>
+<li class="toc-item toc-indent-1"><a href="#9-3-retry-con-tenacity">9.3. Retry con Tenacity</a></li>
+<li class="toc-item toc-indent-1"><a href="#9-4-estrategia-de-degradacion">9.4. Estrategia de Degradación</a></li>
+<li class="toc-item"><a href="#10-despliegue-en-oci">10. Despliegue en OCI</a></li>
+<li class="toc-item toc-indent-1"><a href="#10-1-build-de-la-imagen-docker">10.1. Build de la Imagen Docker</a></li>
+<li class="toc-item toc-indent-1"><a href="#10-2-configuracion-oci-container-instance">10.2. Configuración OCI Container Instance</a></li>
+<li class="toc-item toc-indent-1"><a href="#10-3-health-check">10.3. Health Check</a></li>
+<li class="toc-item toc-indent-1"><a href="#10-4-variables-en-oci-vault">10.4. Variables en OCI Vault</a></li>
+<li class="toc-item"><a href="#11-monitoreo-y-alarmas">11. Monitoreo y Alarmas</a></li>
+<li class="toc-item toc-indent-1"><a href="#11-1-logs">11.1. Logs</a></li>
+<li class="toc-item toc-indent-1"><a href="#11-2-metricas-clave">11.2. Métricas Clave</a></li>
+<li class="toc-item toc-indent-1"><a href="#11-3-alarmas-sugeridas">11.3. Alarmas Sugeridas</a></li>
+<li class="toc-item"><a href="#12-troubleshooting">12. Troubleshooting</a></li>
+<li class="toc-item toc-indent-1"><a href="#errores-comunes">Errores Comunes</a></li>
+<li class="toc-item toc-indent-1"><a href="#comandos-utiles">Comandos Útiles</a></li>
+<li class="toc-item"><a href="#rate-limiting">Rate Limiting</a></li>
+<li class="toc-item"><a href="#clasificacion-de-errores-por-capa">Clasificación de Errores por Capa</a></li>
+</ul>
+</nav>
+
+<h1 id="manual-de-implementacion-fiscalia-api">Manual de Implementación — FiscalIA API</h1>
+<hr>
+<h2 id="1-descripcion-general">1. Descripción General</h2>
+<p>FiscalIA es un microservicio de IA para la fiscalización del ICA (Impuesto de Industria, Comercio y Oficios Varios) en Valledupar, Colombia. Orquesta agentes de IA para:</p>
+<ul>
+<li><strong>Pre-filtrado masivo:</strong> Obtención y clasificación de contribuyentes vía Oracle Database directo (oracledb)</li>
+<li><strong>Análisis individual/batch:</strong> Evaluación fiscal con LLM (fallback de 3 niveles)</li>
+<li><strong>Detección de hallazgos:</strong> Motor de reglas fiscales (R01-R10) con fuerza probatoria</li>
+<li><strong>Análisis comportamental:</strong> Detección de patrones anómalos entre contribuyentes</li>
+<li><strong>Gestión de expedientes:</strong> Ciclo de vida completo de hallazgos fiscales (DETECTADO → CONFIRMADO)</li>
+</ul>
+<p><strong>Modelo de seguridad:</strong> Solo red privada OCI. APEX es el único consumidor vía red interna.</p>
+<hr>
+<h2 id="2-arquitectura">2. Arquitectura</h2>
+<h3 id="2-1-diagrama-de-capas">2.1. Diagrama de Capas</h3>
+<div class="mermaid">flowchart TB
+    subgraph INBOUND["🔌 INBOUND ADAPTERS"]
+        direction TB
+        R["routers/<br/>FastAPI HTTP/REST"]
+        S["schemas/<br/>Pydantic request/response"]
+        M["middleware/<br/>Error Handler · Rate Limiter · Logging"]
+        MA["main.py<br/>App factory + lifespan"]
+    end
+
+    subgraph APP["⚙️ APPLICATION"]
+        direction TB
+        U1["orquestar_proceso.py<br/>Análisis batch/individual"]
+        U2["analizar_comportamiento.py<br/>Análisis comportamental"]
+        U3["analizar_grafo_riesgo.py<br/>Grafo de riesgo"]
+        U4["generar_expediente_fiscal.py<br/>Expediente consolidado"]
+        U5["aplicar_reglas_fiscales.py<br/>Motor R01-R10"]
+        U6["gestionar_hallazgos.py<br/>CRUD hallazgos"]
+        U7["revisar_hallazgo_agente.py<br/>Revisión IA de hallazgos"]
+        U8["construir_perfil_fiscal.py<br/>Perfil desde Oracle"]
+    end
+
+    subgraph DOMAIN["🧠 DOMAIN"]
+        direction TB
+        P["domain/ports/<br/>ABCs: LLMProvider, repositorios"]
+        DS["domain/services/<br/>Lógica pura: SRF, inconsistencias"]
+        B["domain/behavioral/<br/>Score comportamental, indicadores"]
+        F["domain/fiscal/<br/>Score unificado, expediente"]
+        FI["domain/fiscalizacion/<br/>Reglas R01-R10, scoring"]
+        G["domain/graph/<br/>Grafo de riesgo empresarial"]
+        E["domain/errors.py<br/>FiscalIAError hierarchy"]
+        NOTE["CERO dependencias externas"]
+    end
+
+    subgraph OUTBOUND["🗄️ OUTBOUND ADAPTERS"]
+        direction TB
+        LLM["infrastructure/llm/<br/>4 providers + fallback chain"]
+        PG["infrastructure/persistence/<br/>asyncpg pool + queries + hallazgos"]
+        MCP["infrastructure/mcp/<br/>Oracle Client (oracledb direct) + behavioral + graph"]
+    end
+
+    INBOUND -->|"llaman a Use Cases"| APP
+    APP -->|"depende de ports"| DOMAIN
+    DOMAIN -->|"implementado por adapters"| OUTBOUND
+
+    style INBOUND fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style APP fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style DOMAIN fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style OUTBOUND fill:#fce4ec,stroke:#c62828,stroke-width:2px</div>
+<h3 id="2-2-arbol-del-proyecto">2.2. Árbol del Proyecto</h3>
+<div class="mermaid">mindmap
+  root((fiscalia-ia))
+    domain
+      errors.py
+      ports
+        contribuyente_repo.py
+        llm_port.py
+        lookup_repository.py
+        proceso_repo.py
+      services
+        crosscheck_service.py
+        inconsistency_service.py
+      behavioral
+        behavioral_score.py
+        indicators.py
+        peer_group.py
+        seasonal.py
+      fiscal
+        unified_score.py
+        dossier.py
+      fiscalizacion
+        agent_reviewer.py
+        legal_window.py
+        rule_engine.py
+        rules_catalog.py
+        scoring.py
+      graph
+        models.py
+        taxpayer_graph.py
+        network_score.py
+      entities
+        contribuyente.py
+        analisis.py
+        hallazgo.py
+      value_objects
+        nit.py
+        periodo.py
+        dinero.py
+        score_riesgo.py
+    application
+      use_cases
+        orquestar_proceso.py
+        analizar_comportamiento.py
+        analizar_grafo_riesgo.py
+        generar_expediente_fiscal.py
+        aplicar_reglas_fiscales.py
+        gestionar_hallazgos.py
+        revisar_hallazgo_agente.py
+    infrastructure
+      llm
+        anthropic_provider.py
+        openai_provider.py
+        nvidia_nim_provider.py
+        huggingface_provider.py
+        llm_service.py
+        prompts.py
+      persistence
+        connection.py
+        queries.py
+        hallazgos_queries.py
+        repositorio_proceso.py
+        repositorio_contribuyente.py
+        repositorio_lookup.py
+      mcp
+        oracle_adapter.py
+        pagination.py
+        classify.py
+        behavioral.py
+        graph.py
+    middleware
+      error_handler.py
+      logging.py
+      rate_limiter.py
+    routers
+      health.py
+      proceso.py
+      status.py
+      results.py
+      errors.py
+      analisis.py
+      entidad.py
+      behavioral.py
+      fiscalizacion.py
+      export.py
+    schemas
+    cache
+    tasks
+      analisis_task.py
+      concurrency.py
+      retry.py
+    presentation
+      graph_viewer.py
+    tests</div>
+<hr>
+<h2 id="3-prerrequisitos">3. Prerrequisitos</h2>
+<table><thead><tr><th>Requisito</th><th>Versión mínima</th><th>Notas</th></tr></thead><tbody>
+<tr><td>Python</td><td>3.12+</td><td>Recomendado: 3.12</td></tr>
+<tr><td>PostgreSQL</td><td>16+</td><td>asyncpg pool asíncrono</td></tr>
+<tr><td>pip</td><td>24+</td><td>Gestor de paquetes</td></tr>
+<tr><td>Git</td><td>2.x</td><td>Control de versiones</td></tr>
+<tr><td>Docker</td><td>24+ (opcional)</td><td>Para despliegue</td></tr>
+<tr><td>Oracle Client</td><td>oracledb</td><td>Conexión directa a Oracle 19c+</td></tr>
+</tbody></table>
+<h3 id="api-keys-necesarias">API Keys necesarias</h3>
+<table><thead><tr><th>Servicio</th><th>Tier</th><th>Obligatorio</th><th>Registro</th></tr></thead><tbody>
+<tr><td>Anthropic</td><td>Tier 1 (pago)</td><td>Sí (mínimo 1 tier)</td><td>console.anthropic.com</td></tr>
+<tr><td>OpenAI</td><td>Tier 1 (pago)</td><td>Alternativa a Anthropic</td><td>platform.openai.com</td></tr>
+<tr><td>NVIDIA NIM</td><td>Tier 2 (gratis)</td><td>No (fallback)</td><td>developer.nvidia.com</td></tr>
+<tr><td>HuggingFace</td><td>Tier 3 (gratis)</td><td>No (fallback)</td><td>huggingface.co</td></tr>
+</tbody></table>
+<hr>
+<h2 id="4-instalacion-local">4. Instalación Local</h2>
+<h3 id="4-1-clonar-el-repositorio">4.1. Clonar el repositorio</h3>
+<pre><code class="language-bash">git clone &lt;repo-url&gt; fiscalia-ia
+cd fiscalia-ia</code></pre>
+<h3 id="4-2-crear-entorno-virtual">4.2. Crear entorno virtual</h3>
+<pre><code class="language-bash">python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# Linux/Mac
+source .venv/bin/activate</code></pre>
+<h3 id="4-3-instalar-dependencias">4.3. Instalar dependencias</h3>
+<pre><code class="language-bash">pip install -r microservice/requirements.txt</code></pre>
+<h3 id="4-4-configurar-variables-de-entorno">4.4. Configurar variables de entorno</h3>
+<pre><code class="language-bash">cp .env.example .env
+# Editar .env con tus valores reales (ver §5)</code></pre>
+<h3 id="4-5-verificar-instalacion">4.5. Verificar instalación</h3>
+<pre><code class="language-bash"># Linting
+ruff check microservice/ tests/
+
+# Tests unitarios
+PYTHONPATH=microservice pytest tests/unit/ -v
+
+# Cobertura
+PYTHONPATH=microservice pytest tests/unit/ --cov=microservice --cov-report=term</code></pre>
+<h3 id="4-6-ejecutar-el-servidor">4.6. Ejecutar el servidor</h3>
+<pre><code class="language-bash"># Desde la raíz del proyecto
+uvicorn main:app --reload --host 0.0.0.0 --port 8000</code></pre>
+<p>El servidor estará disponible en:</p>
+<ul>
+<li><strong>API:</strong> http://localhost:8000</li>
+<li><strong>Swagger UI:</strong> http://localhost:8000/docs</li>
+<li><strong>ReDoc:</strong> http://localhost:8000/redoc</li>
+</ul>
+<hr>
+<h2 id="5-configuracion-de-variables-de-entorno">5. Configuración de Variables de Entorno</h2>
+<h3 id="5-1-variables-obligatorias">5.1. Variables Obligatorias</h3>
+<pre><code class="language-env"># === PostgreSQL ===
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=fiscalia
+POSTGRES_USER=fiscalia
+POSTGRES_PASSWORD=tu_password_real
+
+# === LLM Tier 1 (mínimo 1 proveedor) ===
+LLM_TIER1_PROVIDER=anthropic
+LLM_TIER1_API_KEY=sk-ant-...
+LLM_TIER1_MODEL=claude-sonnet-4-20250506</code></pre>
+<h3 id="5-2-variables-opcionales-con-defaults">5.2. Variables Opcionales (con defaults)</h3>
+<pre><code class="language-env"># === API ===
+API_PORT=8000
+API_HOST=0.0.0.0
+
+# === Municipio ===
+MUNICIPIO=Valledupar
+DEPARTAMENTO=Cesar
+
+# === Cache ===
+CACHE_TTL_SECONDS=3600    # 1 hora
+
+# === Retry / Timeouts ===
+LLM_TIMEOUT=0             # 0 = sin limite
+RETRY_MAX_ATTEMPTS=1
+RETRY_BACKOFF_FACTOR=2
+RETRY_TIMEOUT=0
+
+# === Performance ===
+NIT_CONCURRENCY=5
+BATCH_DB_SIZE=50
+
+# === Pool PostgreSQL ===
+POOL_MIN_SIZE=4
+POOL_MAX_SIZE=20
+POOL_TIMEOUT=5
+
+# === Background Tasks ===
+MAX_CONCURRENT_PROCESSES=5
+PROCESS_TIMEOUT_MINUTES=0
+
+# === Oracle Database ===
+ORACLE_HOST=138.121.200.30
+ORACLE_PORT=1521
+ORACLE_SERVICE=ORCLPDB
+ORACLE_USER=FISCALIA_APP
+ORACLE_PASSWORD=changeme
+ORACLE_POOL_MIN=2
+ORACLE_POOL_MAX=5
+ORACLE_POOL_TIMEOUT=30
+
+# === Log ===
+LOG_LEVEL=INFO</code></pre>
+<h3 id="5-3-validacion-al-startup">5.3. Validación al Startup</h3>
+<p><code>config.py</code> valida automáticamente que ninguna API key ni contraseña tenga el valor <code>"changeme"</code>. Si se detecta, lanza <code>ConfiguracionInvalidaError</code> con el nombre de la variable ofensiva.</p>
+<p><strong>Nunca</strong> comitear el archivo <code>.env</code> al repositorio (está en <code>.gitignore</code>).</p>
+<h3 id="5-4-configuracion-por-ambiente">5.4. Configuración por Ambiente</h3>
+<table><thead><tr><th>Ambiente</th><th>`LOG_LEVEL`</th><th>`CACHE_TTL`</th><th>`MAX_CONCURRENT_PROCESSES`</th></tr></thead><tbody>
+<tr><td>Desarrollo</td><td>`DEBUG`</td><td>`60` (1 min)</td><td>`2`</td></tr>
+<tr><td>Pruebas</td><td>`INFO`</td><td>`300` (5 min)</td><td>`5`</td></tr>
+<tr><td>Producción</td><td>`INFO`</td><td>`3600` (1 hr)</td><td>`5`</td></tr>
+</tbody></table>
+<hr>
+<h2 id="6-base-de-datos-postgresql">6. Base de Datos PostgreSQL</h2>
+<h3 id="6-1-tablas-del-sistema">6.1. Tablas del Sistema</h3>
+<table><thead><tr><th>Tabla</th><th>Propósito</th><th>Granularidad</th></tr></thead><tbody>
+<tr><td>`entidades_fiscalizadoras`</td><td>Consumidores de la API</td><td>1 fila por entidad</td></tr>
+<tr><td>`procesos`</td><td>Cada criterio de fiscalización</td><td>1 fila por proceso</td></tr>
+<tr><td>`proceso_intentos`</td><td>Cada ejecución/re-lanzamiento</td><td>1 fila por intento</td></tr>
+<tr><td>`proceso_detalle`</td><td>NITs analizados por IA</td><td>1 fila por NIT por intento</td></tr>
+<tr><td>`proceso_errores`</td><td>Errores a nivel de proceso</td><td>1 fila por error</td></tr>
+<tr><td>`proceso_detalle_errores`</td><td>Errores por NIT</td><td>1 fila por error</td></tr>
+<tr><td>`hallazgos_fiscales`</td><td>Hallazgos detectados (R01-R10)</td><td>1 fila por hallazgo</td></tr>
+</tbody></table>
+<h3 id="6-2-diagrama-er">6.2. Diagrama ER</h3>
+<div class="mermaid">erDiagram
+    entidades_fiscalizadoras ||--o{ procesos : "lanza"
+    entidades_fiscalizadoras ||--o{ hallazgos_fiscales : "genera"
+    procesos ||--o{ proceso_intentos : "tiene"
+    procesos ||--o{ proceso_detalle : "detalla"
+    procesos ||--o{ hallazgos_fiscales : "produce"
+    proceso_intentos ||--o{ proceso_errores : "registra"
+    proceso_detalle ||--o{ proceso_detalle_errores : "puede tener"</div>
+<h3 id="6-3-ejecutar-migraciones">6.3. Ejecutar Migraciones</h3>
+<pre><code class="language-bash"># Conectar a PostgreSQL y ejecutar DDL
+psql -h localhost -U fiscalia -d fiscalia -f db/migrations/001_create_tables.sql</code></pre>
+<h3 id="6-4-politica-de-retencion">6.4. Política de Retención</h3>
+<table><thead><tr><th>Tabla</th><th>Retención</th><th>Acción</th></tr></thead><tbody>
+<tr><td>`procesos`, `proceso_intentos`, `proceso_detalle`</td><td>2 años</td><td>DELETE en cascada</td></tr>
+<tr><td>`proceso_errores`, `proceso_detalle_errores`</td><td>1 año</td><td>DELETE</td></tr>
+<tr><td>`entidades_fiscalizadoras`</td><td>Indefinido</td><td>Nunca se eliminan</td></tr>
+</tbody></table>
+<hr>
+<h2 id="7-api-endpoints">7. API Endpoints</h2>
+<p><strong>Base URL:</strong> <code>http://localhost:8000/api/v1</code></p>
+<h3 id="7-1-health-check">7.1. Health Check</h3>
+<table><thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`GET`</td><td>`/health`</td><td>Estado del servicio</td></tr>
+</tbody></table>
+<p><strong>Response (200):</strong></p>
+<pre><code class="language-json">{
+  "status": "healthy",
+  "database": "connected",
+  "oracle": "connected",
+  "version": "2.0.0"
+}</code></pre>
+<p><strong>Flujo del health check:</strong></p>
+<div class="mermaid">flowchart LR
+    A["GET /health"] --> B["Verificar pool<br/>PostgreSQL"]
+    A --> C["Verificar pool<br/>Oracle"]
+    B --> D{"¿Conectado?"}
+    C --> E{"¿Conectado?"}
+    D -->|"Sí"| F["database: connected"]
+    D -->|"No"| G["database: disconnected"]
+    E -->|"Sí"| H["oracle: connected"]
+    E -->|"No"| I["oracle: disconnected"]
+    F --> J["Retornar status"]
+    G --> J
+    H --> J
+    I --> J
+
+    style A fill:#e3f2fd,stroke:#1565c0
+    style F fill:#c8e6c9,stroke:#2e7d32
+    style G fill:#ffcdd2,stroke:#c62828
+    style H fill:#c8e6c9,stroke:#2e7d32
+    style I fill:#ffcdd2,stroke:#c62828</div>
+<hr>
+<h3 id="7-2-entidades-fiscalizadoras">7.2. Entidades Fiscalizadoras</h3>
+<table><thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`POST`</td><td>`/entidad_fiscalizadora`</td><td>Crear entidad</td></tr>
+<tr><td>`GET`</td><td>`/entidad_fiscalizadora/{nit}`</td><td>Obtener entidad por NIT</td></tr>
+<tr><td>`GET`</td><td>`/entidades_fiscalizadoras`</td><td>Listar entidades (paginado)</td></tr>
+</tbody></table>
+<p><strong>POST /entidad_fiscalizadora — Request:</strong></p>
+<pre><code class="language-json">{
+  "entidad_nit": "9003189639",
+  "nombre": "Municipio de Valledupar",
+  "email": "fiscalizacion@valledupar.gov.co"
+}</code></pre>
+<p><strong>Response (201):</strong></p>
+<pre><code class="language-json">{
+  "id": "uuid-de-la-entidad",
+  "entidad_nit": "9003189639",
+  "nombre": "Municipio de Valledupar",
+  "email": "fiscalizacion@valledupar.gov.co",
+  "activo": true
+}</code></pre>
+<hr>
+<h3 id="7-3-procesos-de-fiscalizacion">7.3. Procesos de Fiscalización</h3>
+<table><thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`POST`</td><td>`/proceso`</td><td>Crear proceso asíncrono</td></tr>
+<tr><td>`GET`</td><td>`/proceso/{id}/status`</td><td>Consultar estado</td></tr>
+<tr><td>`GET`</td><td>`/proceso/{id}/results`</td><td>Consultar resultados (paginado)</td></tr>
+<tr><td>`GET`</td><td>`/proceso/{id}/errors`</td><td>Consultar errores</td></tr>
+<tr><td>`GET`</td><td>`/proceso/{id}/export`</td><td>Exportar a XLSX</td></tr>
+</tbody></table>
+<h4 id="post-proceso-crear-proceso-asincrono">POST /proceso — Crear proceso asíncrono</h4>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{
+  "entidad_nit": "9003189639",
+  "nombre": "Proceso Comercio Q1 2024",
+  "vigencia_ini": "2024-01-01",
+  "vigencia_fin": "2024-12-31",
+  "tipo_regimen": "COMUN",
+  "actividades_economicas": ["4711", "4712", "4721"],
+  "periodo": "2024",
+  "tipo": "COMPLETO",
+  "max_nits": 0,
+  "umbral_retenciones_pct": 5.0
+}</code></pre>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Requerido</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`entidad_nit`</td><td>string</td><td>—</td><td>Sí</td><td>NIT de la entidad fiscalizadora</td></tr>
+<tr><td>`nombre`</td><td>string</td><td>—</td><td>Sí</td><td>Nombre descriptivo del proceso</td></tr>
+<tr><td>`vigencia_ini`</td><td>string</td><td>—</td><td>Sí</td><td>Fecha inicial del período (YYYY-MM-DD)</td></tr>
+<tr><td>`vigencia_fin`</td><td>string</td><td>—</td><td>Sí</td><td>Fecha final del período (YYYY-MM-DD)</td></tr>
+<tr><td>`tipo_regimen`</td><td>string</td><td>—</td><td>Sí</td><td>COMUN / SIMPLIFICADO</td></tr>
+<tr><td>`actividades_economicas`</td><td>string[]</td><td>—</td><td>Sí</td><td>Lista de códigos CIIU</td></tr>
+<tr><td>`periodo`</td><td>string</td><td>—</td><td>Sí</td><td>Año fiscal</td></tr>
+<tr><td>`tipo`</td><td>string</td><td>`BASICO`</td><td>No</td><td>`BASICO` = SRF+LLM (paralelo), `COMPLETO` = BASICO + comportamiento + reglas + score + resumen</td></tr>
+<tr><td>`max_nits`</td><td>int</td><td>0</td><td>No</td><td>Límite de NITs a procesar (0 = ilimitado)</td></tr>
+<tr><td>`umbral_retenciones_pct`</td><td>float</td><td>5.0</td><td>No</td><td>Umbral porcentual para inexactos retenciones</td></tr>
+</tbody></table>
+<p><strong>Response (201):</strong></p>
+<pre><code class="language-json">{
+  "proceso_id": "uuid-del-proceso",
+  "intento_id": 1,
+  "estado": "EN_COLA",
+  "nombre": "Proceso Comercio Q1 2024",
+  "entidad_nit": "9003189639",
+  "resumen": {
+    "total_nits": 0,
+    "omisos": 0,
+    "exactos": 0,
+    "inexactos": 0
+  },
+  "proceso_analisis": {
+    "estado": "EN_COLA",
+    "mensaje": "Proceso creado. Iniciando pre-filtrado de candidatos en Oracle."
+  },
+  "created_at": "2026-06-21T10:30:00Z"
+}</code></pre>
+<p><strong>Cancelación:</strong> Endpoint <code>POST /proceso/{proceso_id}/cancelar</code> disponible. Marca el proceso como <code>INTERRUMPIDO</code> y cancela la tarea activa via <code>asyncio.CancelledError</code>.</p>
+<p><strong>Re-lanzamiento:</strong></p>
+<table><thead><tr><th>Situación</th><th>Comportamiento</th></tr></thead><tbody>
+<tr><td>Proceso `EN_PROCESO` con mismos criteria</td><td>HTTP 409 `PROCESO_EN_PROCESO`</td></tr>
+<tr><td>Proceso `COMPLETADO`/`ERROR` con mismos criteria</td><td>Nuevo intento con `numero_intento` incremental</td></tr>
+<tr><td>Resultados anteriores</td><td>Se preservan (historial)</td></tr>
+</tbody></table>
+<p><strong>Flujo interno de POST /proceso:</strong></p>
+<div class="mermaid">sequenceDiagram
+    participant Client as Cliente (APEX)
+    participant API as FastAPI
+    participant Oracle as Oracle Database
+    participant PG as PostgreSQL
+    participant LLM as LLM Service
+
+    Client->>API: POST /proceso (criterios)
+    API->>PG: INSERT proceso (PENDIENTE)
+    API->>PG: INSERT proceso_intentos (EN_PROCESO)
+    API->>Oracle: 4 queries descubrimiento
+    loop Paginación Oracle
+        Oracle-->>API: página de NITs
+        API->>PG: INSERT proceso_detalle
+    end
+    API->>API: Clasificar: omisos / exactos / inexactos
+    API->>PG: UPDATE proceso_detalle (clasificación)
+    API->>PG: UPDATE proceso_intentos (PREFILTRADO_COMPLETADO)
+    API-->>Client: 201 + resumen
+    Note over API,LLM: Background task
+    API->>Oracle: obtener_datos_fiscales(nit)
+    Oracle-->>API: datos fiscales
+    API->>LLM: analizar(datos + contexto)
+    LLM->>LLM: Tier 1 → Tier 2 → Tier 3 (fallback)
+    LLM-->>API: hallazgos + explicación
+    API->>PG: UPDATE proceso_detalle (hallazgos + SRF)
+    API->>PG: UPDATE proceso_intentos (procesados +1)
+    API->>PG: UPDATE proceso_intentos (COMPLETADO)</div>
+<h4 id="get-proceso-id-status-consultar-estado">GET /proceso/{id}/status — Consultar estado</h4>
+<p><strong>Response (200):</strong></p>
+<pre><code class="language-json">{
+  "proceso_id": "uuid-o-id-12345",
+  "estado": "EN_PROCESO",
+  "entidad_nit": "9003189639",
+  "intento_actual": {
+    "numero": 2,
+    "estado": "EN_PROCESO",
+    "procesados": 995,
+    "errores": 3
+  },
+  "progreso": {
+    "porcentaje": 45.2,
+    "total_nits": 2200,
+    "procesados": 995,
+    "faltantes": 1205
+  },
+  "clasificacion": {
+    "omisos": { "total": 1200, "procesados": 600 },
+    "inexactos": { "total": 1000, "procesados": 395 }
+  }
+}</code></pre>
+<p><strong>Estados posibles:</strong></p>
+<table><thead><tr><th>Estado</th><th>Significado</th></tr></thead><tbody>
+<tr><td>`PENDIENTE`</td><td>Proceso creado, esperando ejecución</td></tr>
+<tr><td>`PREFILTRANDO`</td><td>MCP está obteniendo NITs</td></tr>
+<tr><td>`PREFILTRADO_COMPLETADO`</td><td>NITs clasificados, análisis IA en cola</td></tr>
+<tr><td>`EN_COLA`</td><td>Esperando worker disponible</td></tr>
+<tr><td>`EN_PROCESO`</td><td>Análisis IA en ejecución</td></tr>
+<tr><td>`COMPLETADO`</td><td>Todos los NITs analizados</td></tr>
+<tr><td>`INTERRUMPIDO`</td><td>Contenedor reiniciado mid-process (recuperable)</td></tr>
+<tr><td>`ERROR`</td><td>Error en el proceso</td></tr>
+</tbody></table>
+<p><strong>Máquina de estados:</strong></p>
+<div class="mermaid">stateDiagram-v2
+    [*] --> PENDIENTE: POST /proceso
+    PENDIENTE --> PREFILTRANDO: Inicia MCP
+    PREFILTRANDO --> PREFILTRADO_COMPLETADO: MCP completa
+    PREFILTRANDO --> ERROR: MCP falla
+    PREFILTRADO_COMPLETADO --> EN_COLA: Background task encolada
+    EN_COLA --> EN_PROCESO: Worker disponible
+    EN_PROCESO --> COMPLETADO: Todos los NITs OK
+    EN_PROCESO --> ERROR: Timeout / Error fatal
+    EN_PROCESO --> INTERRUMPIDO: Contenedor cae
+    INTERRUMPIDO --> EN_COLA: Re-lanzamiento manual
+    ERROR --> [*]
+    COMPLETADO --> [*]</div>
+<h4 id="get-proceso-id-results-consultar-resultados">GET /proceso/{id}/results — Consultar resultados</h4>
+<p><strong>Query parameters:</strong></p>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`page`</td><td>int</td><td>1</td><td>Número de página</td></tr>
+<tr><td>`page_size`</td><td>int</td><td>50</td><td>Registros por página (max 500)</td></tr>
+<tr><td>`intento_id`</td><td>int</td><td>null</td><td>Filtrar por intento específico</td></tr>
+<tr><td>`include_partial`</td><td>boolean</td><td>false</td><td>Retornar resultados parciales</td></tr>
+<tr><td>`clasificacion`</td><td>string</td><td>null</td><td>`OMISO`, `EXACTO`, `INEXACTO`</td></tr>
+<tr><td>`min_score`</td><td>float</td><td>null</td><td>Score mínimo del MCP</td></tr>
+<tr><td>`ordenar_por`</td><td>string</td><td>`mcp_score`</td><td>Campo de ordenamiento</td></tr>
+<tr><td>`direccion`</td><td>string</td><td>`desc`</td><td>`asc` o `desc`</td></tr>
+</tbody></table>
+<p><strong>Response (200):</strong></p>
+<pre><code class="language-json">{
+  "proceso_id": "uuid-o-id-12345",
+  "estado": "COMPLETADO",
+  "intento_id": 2,
+  "paginacion": {
+    "page": 1,
+    "page_size": 50,
+    "total_registros": 2200,
+    "total_paginas": 44
+  },
+  "resultados": [
+    {
+      "contribuyente_nit": "9003189639",
+      "razon_social": "COMERCIO XYZ S.A.S.",
+      "ciiu": "4711",
+      "clasificacion": "INEXACTO",
+      "mcp_score": 85.5,
+      "mcp_razon": "Diferencia de ingresos del 45%",
+      "srf_total": 78,
+      "nivel_riesgo": "ALTO",
+      "hallazgos": [
+        {
+          "tipo": "SUBDECLARACION_EXOGENA",
+          "declarado_ica": 50000000,
+          "exogena": 120000000,
+          "diferencia": 70000000,
+          "variacion_pct": 140,
+          "explicacion_ia": "El contribuyente declaró $50M en ICA..."
+        }
+      ],
+      "explicacion_ia": "Contribuyente con alto riesgo de subdeclaración..."
+    }
+  ]
+}</code></pre>
+<h4 id="get-proceso-id-errors-consultar-errores">GET /proceso/{id}/errors — Consultar errores</h4>
+<p><strong>Query parameters:</strong></p>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`intento_id`</td><td>int</td><td>null</td><td>Filtrar por intento</td></tr>
+<tr><td>`capa`</td><td>string</td><td>null</td><td>`MCP`, `ORACLE`, `LLM`, `POSTGRES`, `VALIDACION`, `PROCESO`</td></tr>
+<tr><td>`nit`</td><td>string</td><td>null</td><td>Filtrar por NIT</td></tr>
+</tbody></table>
+<p><strong>Response (200):</strong></p>
+<pre><code class="language-json">{
+  "proceso_id": "uuid-o-id-12345",
+  "errores_proceso": [...],
+  "errores_detalle": [...],
+  "total_errores_proceso": 1,
+  "total_errores_detalle": 5
+}</code></pre>
+<h4 id="get-proceso-id-export-exportar-a-xlsx">GET /proceso/{id}/export — Exportar a XLSX</h4>
+<p>Descarga un archivo Excel con los resultados del proceso.</p>
+<p><strong>Query parameters:</strong></p>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`formato`</td><td>string</td><td>`xlsx`</td><td>Formato de exportación</td></tr>
+</tbody></table>
+<p><strong>Response:</strong> Archivo <code>.xlsx</code> con dos hojas:</p>
+<ul>
+<li><strong>Resumen:</strong> ID, estado, totales</li>
+<li><strong>Resultados Campana:</strong> NIT, razón social, CIIU, clasificación, scores, hallazgos, explicación IA</li>
+</ul>
+<p><strong>Flujo de exportación:</strong></p>
+<div class="mermaid">flowchart TD
+    A["GET /proceso/id/export"] --> B["Validar proceso<br/>existe"]
+    B --> C{"¿Existe?"}
+    C -->|"No"| D["404<br/>ProcesoNoEncontrado"]
+    C -->|"Sí"| E["SELECT proceso_detalle<br/>page_size=10000"]
+    E --> F["Crear workbook<br/>openpyxl"]
+    F --> G["Hoja 1: Resumen<br/>(ID, estado, totales)"]
+    F --> H["Hoja 2: Resultados<br/>(NIT, scores, hallazgos)"]
+    H --> I{"¿nivel_riesgo?"}
+    I -->|"ALTO"| J["Fila roja<br/>(#F8D7DA)"]
+    I -->|"MEDIO"| K["Fila amarilla<br/>(#FFF3CD)"]
+    I -->|"BAJO"| L["Fila normal"]
+    G --> M["StreamingResponse<br/>application/xlsx"]
+    H --> M
+    J --> M
+    K --> M
+    L --> M
+
+    style A fill:#e3f2fd,stroke:#1565c0
+    style D fill:#ffcdd2,stroke:#c62828
+    style M fill:#c8e6c9,stroke:#2e7d32</div>
+<p><strong>Flujo de consulta de resultados:</strong></p>
+<div class="mermaid">flowchart TD
+    A["GET /proceso/id/results"] --> B{"intento_id?"}
+    B -->|"null"| C["Usar último intento"]
+    B -->|"num"| D["Usar intento especificado"]
+    C --> E{"include_partial?"}
+    D --> E
+    E -->|"false"| F{"Proceso terminado?"}
+    F -->|"COMPLETADO"| G["SELECT paginado"]
+    F -->|"EN_PROCESO / EN_COLA"| H["409 PROCESO_EN_PROCESO"]
+    E -->|"true"| G
+    G --> I{"Filtros?"}
+    I -->|"clasificacion"| J["WHERE clasificacion = x"]
+    I -->|"min_score"| K["WHERE mcp_score >= x"]
+    I -->|"sin filtros"| L["ORDER BY + LIMIT/OFFSET"]
+    J --> L
+    K --> L
+    L --> M["Retornar resultados + paginación"]</div>
+<hr>
+<h3 id="7-4-analisis-individual">7.4. Análisis Individual</h3>
+<table><thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`POST`</td><td>`/analizar/{contribuyente_nit}?periodo=2024`</td><td>Análisis on-demand (sin body)</td></tr>
+</tbody></table>
+<p><strong>Parámetros:</strong></p>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Requerido</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`contribuyente_nit`</td><td>string</td><td>—</td><td>Sí (path)</td><td>NIT del contribuyente a analizar</td></tr>
+<tr><td>`periodo`</td><td>string</td><td>`2024`</td><td>No (query)</td><td>Año fiscal a analizar</td></tr>
+</tbody></table>
+<p><strong>Sin body</strong> — el NIT va como path param y el período como query param.</p>
+<p><strong>Response (200):</strong></p>
+<pre><code class="language-json">{
+  "contribuyente_nit": "9012345678",
+  "razon_social": "COMERCIO XYZ S.A.S.",
+  "ciiu": "4711",
+  "clasificacion": "INEXACTO",
+  "mcp_score": 85.5,
+  "mcp_razon": "",
+  "srf_total": 78,
+  "componentes_srf": [
+    { "nombre": "consistencia", "valor": 80, "peso": 0.3 },
+    { "nombre": "historial", "valor": 75, "peso": 0.4 },
+    { "nombre": "declaracion", "valor": 82, "peso": 0.3 }
+  ],
+  "nivel_riesgo": "ALTO",
+  "hallazgos": [...],
+  "explicacion_ia": "Contribuyente con alto riesgo de subdeclaración...",
+  "tokens_utilizados": 2500,
+  "duracion_ms": 45000,
+  "provider_utilizado": "anthropic",
+  "cache_hit": false
+}</code></pre>
+<p><strong>Comportamiento:</strong></p>
+<ul>
+<li>Timeout: 90 segundos máximo</li>
+<li>Cache: Si el mismo NIT + periodo fue analizado en < 1h, retorna cache</li>
+<li>No crea proceso en <code>procesos</code> (es análisis on-demand)</li>
+</ul>
+<p><strong>Flujo del análisis individual:</strong></p>
+<div class="mermaid">sequenceDiagram
+    participant Client as Cliente
+    participant API as FastAPI
+    participant Cache as Cache
+    participant Oracle as Oracle Database
+    participant LLM as LLM Service
+
+    Client->>API: POST /analizar/{nit}?periodo=2024
+    API->>Cache: Buscar en caché (NIT + periodo)
+    alt Cache hit
+        Cache-->>API: Resultado缓存ado
+        API-->>Client: 200 (respuesta缓存)
+    else Cache miss
+        API->>Oracle: obtener_datos_fiscales(nit)
+        Oracle-->>API: datos fiscales
+        API->>LLM: analizar(datos)
+        LLM->>LLM: Tier 1 → Tier 2 → Tier 3
+        LLM-->>API: hallazgos + explicación
+        API->>Cache: Guardar resultado (TTL 1h)
+        API-->>Client: 200 + resultados
+    end</div>
+<hr>
+<h3 id="7-5-analisis-comportamental">7.5. Análisis Comportamental</h3>
+<table><thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`GET`</td><td>`/contribuyente/{nit}/comportamiento`</td><td>Análisis comportamental individual</td></tr>
+<tr><td>`GET`</td><td>`/proceso/{id}/ranking-comportamental`</td><td>Ranking comportamental del proceso</td></tr>
+<tr><td>`GET`</td><td>`/contribuyente/{nit}/grafo-riesgo`</td><td>Grafo de riesgo</td></tr>
+<tr><td>`GET`</td><td>`/contribuyente/{nit}/expediente-fiscal`</td><td>Expediente fiscal consolidado</td></tr>
+<tr><td>`GET`</td><td>`/visor/grafo/{nit}`</td><td>Visor HTML del grafo</td></tr>
+</tbody></table>
+<h4 id="get-contribuyente-nit-comportamiento">GET /contribuyente/{nit}/comportamiento</h4>
+<p><strong>Query parameters:</strong></p>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`periodo`</td><td>string</td><td>`2024`</td><td>Año fiscal</td></tr>
+<tr><td>`ciiu`</td><td>string</td><td>null</td><td>Filtro por código CIIU</td></tr>
+<tr><td>`regimen`</td><td>string</td><td>null</td><td>Filtro por régimen</td></tr>
+<tr><td>`min_pares`</td><td>int</td><td>`10`</td><td>Mínimo de pares comparables (3-100)</td></tr>
+</tbody></table>
+<h4 id="get-contribuyente-nit-grafo-riesgo">GET /contribuyente/{nit}/grafo-riesgo</h4>
+<p><strong>Query parameters:</strong></p>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`periodo`</td><td>string</td><td>`2024`</td><td>Año fiscal</td></tr>
+<tr><td>`min_pares`</td><td>int</td><td>`10`</td><td>Mínimo de pares (3-100)</td></tr>
+<tr><td>`incluir_comportamiento`</td><td>bool</td><td>`true`</td><td>Incluir datos comportamentales</td></tr>
+</tbody></table>
+<hr>
+<h3 id="7-6-fiscalizacion-reglas-r01-r10">7.6. Fiscalización (Reglas R01-R10)</h3>
+<table><thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`POST`</td><td>`/fiscalizacion/reglas/evaluar`</td><td>Evaluar reglas sin persistir</td></tr>
+<tr><td>`POST`</td><td>`/fiscalizacion/reglas/evaluar/{nit}`</td><td>Evaluar reglas por NIT</td></tr>
+<tr><td>`POST`</td><td>`/fiscalizacion/reglas/ejecutar`</td><td>Ejecutar reglas y crear hallazgos</td></tr>
+<tr><td>`POST`</td><td>`/fiscalizacion/reglas/ejecutar/{nit}`</td><td>Ejecutar reglas por NIT</td></tr>
+<tr><td>`POST`</td><td>`/fiscalizacion/hallazgos`</td><td>Crear hallazgo manual</td></tr>
+<tr><td>`POST`</td><td>`/fiscalizacion/hallazgos/desde-grafo/{nit}`</td><td>Crear hallazgo desde grafo</td></tr>
+<tr><td>`GET`</td><td>`/fiscalizacion/hallazgos`</td><td>Listar hallazgos (paginado)</td></tr>
+<tr><td>`GET`</td><td>`/fiscalizacion/hallazgos/{id}`</td><td>Obtener hallazgo</td></tr>
+<tr><td>`POST`</td><td>`/fiscalizacion/hallazgos/{id}/revision`</td><td>Revisar hallazgo (humano)</td></tr>
+<tr><td>`POST`</td><td>`/fiscalizacion/hallazgos/{id}/revision-agente`</td><td>Revisar hallazgo con IA</td></tr>
+</tbody></table>
+<h4 id="post-fiscalizacion-reglas-evaluar-nit">POST /fiscalizacion/reglas/evaluar/{nit}</h4>
+<p>Evalúa las reglas fiscales para un NIT específico sin persistir resultados.</p>
+<p><strong>Query parameters:</strong></p>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`periodo`</td><td>string</td><td>`2024`</td><td>Período fiscal</td></tr>
+<tr><td>`reglas`</td><td>list</td><td>null</td><td>Filtrar reglas específicas (R01, R02, etc.)</td></tr>
+</tbody></table>
+<p><strong>Response (200):</strong></p>
+<pre><code class="language-json">{
+  "total": 3,
+  "resultados": [
+    {
+      "regla": "R01",
+      "tipo_hallazgo": "OMISION",
+      "fuerza_probatoria": "DIRECTA",
+      "brecha_valor": 15000000,
+      "score": 0.85
+    }
+  ]
+}</code></pre>
+<h4 id="get-fiscalizacion-hallazgos-listar-hallazgos">GET /fiscalizacion/hallazgos — Listar hallazgos</h4>
+<p><strong>Query parameters:</strong></p>
+<table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`estado`</td><td>string</td><td>null</td><td>`DETECTADO`, `EN_REVISION`, `CONFIRMADO`, `DESCARTADO`</td></tr>
+<tr><td>`regla`</td><td>string</td><td>null</td><td>Filtrar por regla (R01-R10)</td></tr>
+<tr><td>`contribuyente_nit`</td><td>string</td><td>null</td><td>Filtrar por NIT</td></tr>
+<tr><td>`accionable`</td><td>bool</td><td>null</td><td>Solo accionables</td></tr>
+<tr><td>`page`</td><td>int</td><td>1</td><td>Página</td></tr>
+<tr><td>`page_size`</td><td>int</td><td>50</td><td>Registros por página (max 200)</td></tr>
+</tbody></table>
+<p><strong>Flujo del motor de reglas fiscales:</strong></p>
+<div class="mermaid">flowchart LR
+    A["Perfil fiscal<br/>(datos Oracle)"] --> B["AplicarReglas<br/>R01-R10"]
+    B --> C{"¿Regla<br/>aplica?"}
+    C -->|"Sí"| D["Calcular brecha<br/>+ impuesto"]
+    C -->|"No"| E["Descartar regla"]
+    D --> F["Calcular score<br/>(confianza)"]
+    F --> G{"¿score > 0.5?"}
+    G -->|"Sí"| H["Crear hallazgo<br/>DETECTADO"]
+    G -->|"No"| I["Registrar como<br/>info sin hallazgo"]
+    H --> J["Persistir en<br/>hallazgos_fiscales"]</div>
+<hr>
+<h2 id="8-ejemplos-de-uso">8. Ejemplos de Uso</h2>
+<h3 id="8-1-curl-crear-proceso">8.1. curl — Crear proceso</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8000/api/v1/proceso \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entidad_nit": "9003189639",
+    "nombre": "Proceso Comercio Q1 2024",
+    "vigencia_ini": "2024-01-01",
+    "vigencia_fin": "2024-12-31",
+    "tipo_regimen": "COMUN",
+    "actividades_economicas": ["4711", "4712"],
+    "periodo": "2024",
+    "tipo": "COMPLETO",
+    "max_nits": 0,
+    "umbral_retenciones_pct": 5.0
+  }'</code></pre>
+<h3 id="8-2-curl-consultar-estado">8.2. curl — Consultar estado</h3>
+<pre><code class="language-bash">curl http://localhost:8000/api/v1/proceso/{proceso_id}/status</code></pre>
+<h3 id="8-3-curl-consultar-resultados">8.3. curl — Consultar resultados</h3>
+<pre><code class="language-bash">curl "http://localhost:8000/api/v1/proceso/{proceso_id}/results?page=1&amp;page_size=20&amp;clasificacion=INEXACTO"</code></pre>
+<h3 id="8-4-curl-analisis-individual">8.4. curl — Análisis individual</h3>
+<pre><code class="language-bash">curl -X POST "http://localhost:8000/api/v1/analizar/9012345678?periodo=2024"</code></pre>
+<h3 id="8-5-curl-evaluar-reglas-fiscales">8.5. curl — Evaluar reglas fiscales</h3>
+<pre><code class="language-bash">curl -X POST "http://localhost:8000/api/v1/fiscalizacion/reglas/evaluar/9012345678?periodo=2024"</code></pre>
+<h3 id="8-6-curl-exportar-resultados">8.6. curl — Exportar resultados</h3>
+<pre><code class="language-bash">curl -o resultados.xlsx "http://localhost:8000/api/v1/proceso/{proceso_id}/export?formato=xlsx"</code></pre>
+<h3 id="8-7-python-conexion-desde-apex-via-requests">8.7. Python — Conexión desde APEX/vía requests</h3>
+<pre><code class="language-python">import requests
+
+BASE_URL = "http://localhost:8000/api/v1"
+
+# Crear proceso
+response = requests.post(f"{BASE_URL}/proceso", json={
+    "entidad_nit": "9003189639",
+    "nombre": "Auditoría Q1 2024",
+    "vigencia_ini": "2024-01-01",
+    "vigencia_fin": "2024-12-31",
+    "periodo": "2024",
+    "tipo": "COMPLETO",
+    "max_nits": 0,
+    "umbral_retenciones_pct": 5.0
+})
+proceso_id = response.json()["proceso_id"]
+
+# Polling de estado
+import time
+while True:
+    status = requests.get(f"{BASE_URL}/proceso/{proceso_id}/status").json()
+    if status["estado"] in ("COMPLETADO", "ERROR"):
+        break
+    time.sleep(5)
+
+# Obtener resultados
+results = requests.get(f"{BASE_URL}/proceso/{proceso_id}/results").json()</code></pre>
+<h3 id="8-8-pl-sql-desde-oracle-apex">8.8. PL/SQL — Desde Oracle APEX</h3>
+<pre><code class="language-sql">DECLARE
+    l_response CLOB;
+BEGIN
+    l_response := apex_web_service.make_rest_request(
+        p_url         =&gt; 'http://&lt;container-ip&gt;:8000/api/v1/analizar/9012345678?periodo=2024',
+        p_http_method =&gt; 'POST'
+    );
+END;</code></pre>
+<hr>
+<h2 id="9-sistema-de-fallback-llm">9. Sistema de Fallback LLM</h2>
+<h3 id="9-1-cadena-de-fallback">9.1. Cadena de Fallback</h3>
+<div class="mermaid">flowchart TD
+    Request["Solicitud de análisis"] --> T1
+    T1["Tier 1 — Anthropic Claude\n(o OpenAI GPT)"] -->|éxito| Response["Respuesta estructurada"]
+    T1 -->|timeout/rate_limit/error| T2
+    T2["Tier 2 — NVIDIA NIM\nQwen2.5-7B (gratis)"] -->|éxito| Response
+    T2 -->|timeout/rate_limit/error| T3
+    T3["Tier 3 — HuggingFace\nQwen2.5-7B (gratis)"] -->|éxito| Response
+    T3 -->|fallo| Degrade["Resultado degradado + error registrado"]</div>
+<h3 id="9-2-configuracion-de-providers">9.2. Configuración de Providers</h3>
+<table><thead><tr><th>Prioridad</th><th>Provider</th><th>Tipo</th><th>Modelo</th><th>API</th></tr></thead><tbody>
+<tr><td>Tier 1</td><td>Anthropic</td><td>Pago</td><td>claude-sonnet-4-20250506</td><td>Anthropic SDK</td></tr>
+<tr><td>Tier 1</td><td>OpenAI</td><td>Pago</td><td>gpt-4o</td><td>OpenAI SDK</td></tr>
+<tr><td>Tier 2</td><td>NVIDIA NIM</td><td>Gratis (5K credits)</td><td>qwen/qwen2.5-7b-instruct</td><td>OpenAI-compatible</td></tr>
+<tr><td>Tier 3</td><td>HuggingFace</td><td>Gratis (créditos mensuales)</td><td>Qwen/Qwen2.5-7B-Instruct</td><td>OpenAI-compatible</td></tr>
+</tbody></table>
+<h3 id="9-3-retry-con-tenacity">9.3. Retry con Tenacity</h3>
+<pre><code class="language-python">@tenacity.retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, max=10),
+    retry=(retry_if_exception_type(TimeoutError) |
+           retry_if_exception_type(RateLimitError) |
+           retry_if_exception_type(APIError)),
+)
+async def call_provider(messages, schema):
+    return await provider.chat_json(messages, schema)</code></pre>
+<h3 id="9-4-estrategia-de-degradacion">9.4. Estrategia de Degradación</h3>
+<p>Cuando todos los providers fallan: 1. El NIT se marca con <code>LLM_ALL_PROVIDERS_FAILED</code> en <code>proceso_detalle_errores</code> 2. <code>explicacion_ia</code> queda como <code>null</code> 3. El proceso continúa con el siguiente NIT (no se aborta el batch)</p>
+<hr>
+<h2 id="10-despliegue-en-oci">10. Despliegue en OCI</h2>
+<h3 id="10-1-build-de-la-imagen-docker">10.1. Build de la Imagen Docker</h3>
+<pre><code class="language-bash"># Construir
+docker build -t iat/fiscalia-ia:latest .
+
+# Taggear para OCI Registry
+docker tag iat/fiscalia-ia:latest &lt;region&gt;.ocir.io/&lt;namespace&gt;/fiscalia-ia:latest
+
+# Push
+docker push &lt;region&gt;.ocir.io/&lt;namespace&gt;/fiscalia-ia:latest</code></pre>
+<h3 id="10-2-configuracion-oci-container-instance">10.2. Configuración OCI Container Instance</h3>
+<table><thead><tr><th>Configuración</th><th>Valor</th></tr></thead><tbody>
+<tr><td>**VCN**</td><td>VCN existente del proyecto Taxation Smart</td></tr>
+<tr><td>**Subred**</td><td>Privada (sin IP pública)</td></tr>
+<tr><td>**NSG**</td><td>Regla de entrada solo desde IPs de APEX</td></tr>
+<tr><td>**Puerto**</td><td>8000</td></tr>
+<tr><td>**CPU**</td><td>1 OCPU</td></tr>
+<tr><td>**Memoria**</td><td>8 GB</td></tr>
+<tr><td>**Disco**</td><td>10 GB</td></tr>
+<tr><td>**Instancias**</td><td>1 (V1)</td></tr>
+</tbody></table>
+<p><strong>Arquitectura de despliegue:</strong></p>
+<div class="mermaid">flowchart TB
+    subgraph OCI["☁️ Oracle Cloud Infrastructure"]
+        subgraph VCN["VCN Privada"]
+            subgraph SUBNET["Subnet Privada"]
+                CI["Container Instance<br/>FiscalIA API<br/>:8000"]
+            end
+        end
+        subgraph VAULT["OCI Vault"]
+            V1["POSTGRES_PASSWORD"]
+            V2["LLM_TIER1_API_KEY"]
+            V3["LLM_TIER2_API_KEY"]
+            V4["LLM_TIER3_API_KEY"]
+        end
+        subgraph LOGGING["OCI Logging"]
+            LOG["Stdout logs"]
+        end
+    end
+
+    subgraph EXT["Recursos Externos"]
+        PG["PostgreSQL 16+<br/>10.0.1.100:5432"]
+        ORA["Oracle 19c+<br/>(oracledb direct)"]
+        LLM1["Anthropic API"]
+        LLM2["NVIDIA NIM API"]
+        LLM3["HuggingFace API"]
+    end
+
+    subgraph CLIENT["Clientes"]
+        APEX["Oracle APEX<br/>Dynamic Actions"]
+    end
+
+    APEX -->|"HTTP (red privada)"| CI
+    CI -->|"asyncpg"| PG
+    CI -->|"oracledb"| ORA
+    CI -->|"HTTPS"| LLM1
+    CI -->|"HTTPS"| LLM2
+    CI -->|"HTTPS"| LLM3
+    VAULT -.->|"secrets"| CI
+    CI -->|"stdout"| LOG
+
+    style OCI fill:#e8eaf6,stroke:#283593,stroke-width:2px
+    style EXT fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    style CLIENT fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px</div>
+<h3 id="10-3-health-check">10.3. Health Check</h3>
+<pre><code class="language-">Ruta:       /api/v1/health
+Puerto:     8000
+Intervalo:  30s
+Timeout:    10s
+Umbral:     3 intentos fallidos</code></pre>
+<h3 id="10-4-variables-en-oci-vault">10.4. Variables en OCI Vault</h3>
+<p>Configurar todas las variables sensibles en <strong>OCI Vault</strong>, nunca en texto plano:</p>
+<ul>
+<li><code>POSTGRES_PASSWORD</code></li>
+<li><code>LLM_TIER1_API_KEY</code></li>
+<li><code>LLM_TIER2_API_KEY</code></li>
+<li><code>LLM_TIER3_API_KEY</code></li>
+<li><code>ORACLE_PASSWORD</code></li>
+</ul>
+<hr>
+<h2 id="11-monitoreo-y-alarmas">11. Monitoreo y Alarmas</h2>
+<h3 id="11-1-logs">11.1. Logs</h3>
+<ul>
+<li>OCI Logging recibe stdout del contenedor</li>
+<li>Cada análisis genera log estructurado: <code>nit</code>, <code>periodo</code>, <code>tiempo_ms</code>, <code>tokens</code>, <code>cache_hit</code>, <code>provider</code></li>
+</ul>
+<h3 id="11-2-metricas-clave">11.2. Métricas Clave</h3>
+<table><thead><tr><th>Métrica</th><th>Target</th></tr></thead><tbody>
+<tr><td>Latencia POST /proceso</td><td>&lt; 30s</td></tr>
+<tr><td>Latencia POST /analizar/{nit}</td><td>&lt; 90s</td></tr>
+<tr><td>Cache hit ratio</td><td>&gt; 30%</td></tr>
+<tr><td>Errores 5xx</td><td>&lt; 1%</td></tr>
+<tr><td>Tokens consumidos/mes</td><td>Monitorear</td></tr>
+</tbody></table>
+<h3 id="11-3-alarmas-sugeridas">11.3. Alarmas Sugeridas</h3>
+<table><thead><tr><th>Alarma</th><th>Umbral</th><th>Acción</th></tr></thead><tbody>
+<tr><td>Latencia &gt; 90s</td><td>&gt; 3 en 5 min</td><td>Notificar equipo</td></tr>
+<tr><td>Errores 5xx</td><td>&gt; 5 en 5 min</td><td>Notificar equipo</td></tr>
+<tr><td>PostgreSQL caído</td><td>1 ocurrencia</td><td>Notificar equipo</td></tr>
+<tr><td>Costo LLM mensual</td><td>&gt; $100 USD</td><td>Revisar uso</td></tr>
+</tbody></table>
+<hr>
+<h2 id="12-troubleshooting">12. Troubleshooting</h2>
+<h3 id="errores-comunes">Errores Comunes</h3>
+<table><thead><tr><th>Error</th><th>Causa</th><th>Solución</th></tr></thead><tbody>
+<tr><td>`ConfiguracionInvalidaError`</td><td>API key o password = "changeme"</td><td>Editar `.env` con valores reales</td></tr>
+<tr><td>`PG_CONN_ERROR`</td><td>PostgreSQL no accesible</td><td>Verificar `POSTGRES_HOST`, firewall, pg_hba.conf</td></tr>
+<tr><td>`MCP_TIMEOUT`</td><td>Oracle Database no responde</td><td>Verificar conexión oracledb, firewall, configuración Oracle</td></tr>
+<tr><td>`ORACLE_NIT_NOT_FOUND`</td><td>NIT no encontrado en Oracle</td><td>Verificar el NIT en el padrón de contribuyentes</td></tr>
+<tr><td>`LLM_ALL_PROVIDERS_FAILED`</td><td>Todos los LLM fallaron</td><td>Verificar API keys, créditos, rate limits</td></tr>
+<tr><td>`PROCESO_EN_PROCESO`</td><td>Re-lanzar proceso en ejecución</td><td>Esperar a que termine o usar `include_partial=true`</td></tr>
+<tr><td>`NIT_NO_ENCONTRADO`</td><td>NIT no existe en Oracle</td><td>Verificar el NIT en la fuente de datos</td></tr>
+</tbody></table>
+<h3 id="comandos-utiles">Comandos Útiles</h3>
+<pre><code class="language-bash"># Ver logs en tiempo real
+docker logs -f &lt;container-id&gt;
+
+# Verificar conexión PostgreSQL
+psql -h localhost -U fiscalia -d fiscalia -c "SELECT 1"
+
+# Verificar pool de conexiones
+curl http://localhost:8000/api/v1/health
+
+# Tests de regresión
+PYTHONPATH=microservice pytest tests/unit/ -v --tb=short
+
+# Linting
+ruff check microservice/ tests/
+ruff format --check microservice/ tests/</code></pre>
+<hr>
+<h2 id="rate-limiting">Rate Limiting</h2>
+<table><thead><tr><th>Endpoint</th><th>Límite</th><th>Ventana</th></tr></thead><tbody>
+<tr><td>`POST /proceso`</td><td>10 req</td><td>por minuto por IP</td></tr>
+<tr><td>`GET /proceso/{id}/status`</td><td>60 req</td><td>por minuto por IP</td></tr>
+<tr><td>`GET /proceso/{id}/results`</td><td>30 req</td><td>por minuto por IP</td></tr>
+<tr><td>`GET /proceso/{id}/errors`</td><td>30 req</td><td>por minuto por IP</td></tr>
+<tr><td>`POST /analizar/{nit}`</td><td>5 req</td><td>por minuto por IP</td></tr>
+<tr><td>`GET /health`</td><td>Sin límite</td><td>—</td></tr>
+</tbody></table>
+<hr>
+<h2 id="clasificacion-de-errores-por-capa">Clasificación de Errores por Capa</h2>
+<table><thead><tr><th>Capa</th><th>Códigos</th><th>Descripción</th></tr></thead><tbody>
+<tr><td>`MCP`</td><td>`MCP_TIMEOUT`, `MCP_CONN_REFUSED`, `MCP_PAGE_ERROR`</td><td>Conexión Oracle Database (oracledb)</td></tr>
+<tr><td>`ORACLE`</td><td>`ORACLE_QUERY_FAIL`, `ORACLE_TIMEOUT`, `ORACLE_NIT_NOT_FOUND`</td><td>Consultas Oracle 19c+</td></tr>
+<tr><td>`LLM`</td><td>`LLM_TIMEOUT`, `LLM_RATE_LIMIT`, `LLM_ALL_PROVIDERS_FAILED`</td><td>Proveedores LLM</td></tr>
+<tr><td>`POSTGRES`</td><td>`PG_CONN_ERROR`, `PG_INSERT_FAIL`</td><td>Persistencia</td></tr>
+<tr><td>`VALIDACION`</td><td>`CRITERIOS_INVALIDOS`, `NIT_NO_ENCONTRADO`</td><td>Validación entrada</td></tr>
+<tr><td>`PROCESO`</td><td>`WORKER_TIMEOUT`, `ORCHESTRATION_FAIL`</td><td>Orquestación</td></tr>
+</tbody></table>
+<p><strong>Flujo de manejo de errores:</strong></p>
+<div class="mermaid">flowchart TD
+    A["Error en capa"] --> B{"¿Es FiscalIAError?"}
+    B -->|"Sí"| C["error_handler.py<br/>Mapear a HTTP status"]
+    B -->|"No"| D["Exception genérica<br/>→ 500 Internal Server Error"]
+    C --> E["INSERT en<br/>proceso_errores<br/>o proceso_detalle_errores"]
+    E --> F["Log estructurado<br/>+ request_id"]
+    F --> G["Retornar JSON<br/>{error, mensaje, request_id}"]
+    D --> E
+
+    style A fill:#ffcdd2,stroke:#c62828
+    style C fill:#c8e6c9,stroke:#2e7d32
+    style D fill:#ffcdd2,stroke:#c62828</div>
+<hr>
+<blockquote><strong>Autor:</strong> FiscalIA Team   <strong>Repositorio:</strong> fiscalia-ia   <strong>Licencia:</strong> Uso interno — Municipio de Valledupar</blockquote>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#e3f2fd',
+      primaryTextColor: '#0d1b2a',
+      primaryBorderColor: '#1565c0',
+      lineColor: '#1565c0',
+      fontSize: '13px'
+    },
+    securityLevel: 'loose',
+    flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'cardinal' },
+    sequence: { useMaxWidth: true, actorMargin: 50, mirrorActors: false },
+    mindmap: { useMaxWidth: true },
+    er: { useMaxWidth: true }
+  });
+</script>
+</body>
+</html>
