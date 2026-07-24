@@ -16,7 +16,7 @@ services:
       - appnet
 
   postgres:
-    image: infortributos/postgres:16-alpine
+    image: infortributos/postgres:17.7
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
